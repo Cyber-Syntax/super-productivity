@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Check out Git repository
         uses: actions/checkout@v4
         with:
@@ -24,7 +24,7 @@ jobs:
         id: npm-cache-dir
         run: |
           echo "::set-output name=dir::$(npm config get cache)"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
@@ -39,3 +39,10 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npm run e2e
+      - name: 'Upload E2E screenshots on failure'
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2eScreenshots
+          path: e2e/screenshots/**/*.*
+          retention-days: 5

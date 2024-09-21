@@ -7,20 +7,15 @@ import {
   updateTaskRepeatCfgs,
   upsertTaskRepeatCfg,
 } from './task-repeat-cfg.actions';
-import {
-  TASK_REPEAT_WEEKDAY_MAP,
-  TaskRepeatCfg,
-  TaskRepeatCfgState,
-} from '../task-repeat-cfg.model';
+import { TaskRepeatCfg, TaskRepeatCfgState } from '../task-repeat-cfg.model';
 import { createFeatureSelector, createReducer, createSelector, on } from '@ngrx/store';
 import { loadAllData } from '../../../root-store/meta/load-all-data.action';
 import { migrateTaskRepeatCfgState } from '../migrate-task-repeat-cfg-state.util';
 import { isSameDay } from '../../../util/is-same-day';
 import { MODEL_VERSION_KEY } from '../../../app.constants';
 import { MODEL_VERSION } from '../../../core/model-version';
-import { getDiffInMonth } from '../../../util/get-diff-in-month';
-import { getDiffInWeeks } from '../../../util/get-diff-in-weeks';
-import { getDiffInDays } from '../../../util/get-diff-in-days';
+import { getNewestPossibleDueDate } from './get-newest-possible-due-date.util';
+import { deleteProject } from '../../project/store/project.actions';
 
 export const TASK_REPEAT_CFG_FEATURE_NAME = 'taskRepeatCfg';
 
@@ -52,6 +47,27 @@ export const selectTaskRepeatCfgsWithStartTime = createSelector(
   },
 );
 
+export const selectTaskRepeatCfgsWithAndWithoutStartTime = createSelector(
+  selectAllTaskRepeatCfgs,
+  (
+    taskRepeatCfgs: TaskRepeatCfg[],
+  ): {
+    withStartTime: TaskRepeatCfg[];
+    withoutStartTime: TaskRepeatCfg[];
+  } => {
+    const withStartTime: TaskRepeatCfg[] = [];
+    const withoutStartTime: TaskRepeatCfg[] = [];
+    taskRepeatCfgs.forEach((cfg) => {
+      if (cfg.startTime) {
+        withStartTime.push(cfg);
+      } else {
+        withoutStartTime.push(cfg);
+      }
+    });
+    return { withStartTime, withoutStartTime };
+  },
+);
+
 export const selectTaskRepeatCfgsSortedByTitleAndProject = createSelector(
   selectAllTaskRepeatCfgs,
   (taskRepeatCfgs: TaskRepeatCfg[]): TaskRepeatCfg[] => {
@@ -77,7 +93,7 @@ export const selectTaskRepeatCfgsSortedByTitleAndProject = createSelector(
 
 // filter out the configs which have been created today already
 // and those which are not scheduled for the current week day
-export const selectTaskRepeatCfgsDueOnDay = createSelector(
+export const selectTaskRepeatCfgsDueOnDayOnly = createSelector(
   selectAllTaskRepeatCfgs,
   (
     taskRepeatCfgs: TaskRepeatCfg[],
@@ -97,91 +113,40 @@ export const selectTaskRepeatCfgsDueOnDay = createSelector(
           return false;
         }
 
-        switch (taskRepeatCfg.repeatCycle) {
-          case 'DAILY': {
-            if (!taskRepeatCfg.startDate) {
-              throw new Error('Repeat startDate needs to be defined for DAILY');
-            }
-            if (+taskRepeatCfg.repeatEvery < 1) {
-              throw new Error('Invalid repeatEvery value given for DAILY');
-            }
-            const startDateDate = new Date(taskRepeatCfg.startDate);
-            const diffInDays = getDiffInDays(startDateDate, dateToCheckDate);
-
-            return (
-              // start date is not in the future
-              diffInDays >= 0 && diffInDays % taskRepeatCfg.repeatEvery === 0
-            );
-          }
-
-          case 'WEEKLY': {
-            if (!taskRepeatCfg.startDate) {
-              throw new Error('Repeat startDate needs to be defined for WEEKLY');
-            }
-            if (+taskRepeatCfg.repeatEvery < 1) {
-              throw new Error('Invalid repeatEvery value given for WEEKLY');
-            }
-            const startDateDate = new Date(taskRepeatCfg.startDate);
-
-            const todayDay = dateToCheckDate.getDay();
-            const todayDayStr: keyof TaskRepeatCfg = TASK_REPEAT_WEEKDAY_MAP[todayDay];
-            const diffInWeeks = getDiffInWeeks(startDateDate, dateToCheckDate);
-
-            return (
-              // start date is not in the future
-              diffInWeeks >= 0 &&
-              diffInWeeks % taskRepeatCfg.repeatEvery === 0 &&
-              taskRepeatCfg[todayDayStr]
-            );
-          }
-
-          case 'MONTHLY': {
-            if (!taskRepeatCfg.startDate) {
-              throw new Error('Repeat startDate needs to be defined for MONTHLY');
-            }
-            if (+taskRepeatCfg.repeatEvery < 1) {
-              throw new Error('Invalid repeatEvery value given for MONTHLY');
-            }
-            const startDateDate = new Date(taskRepeatCfg.startDate);
-            const isCreationDayThisMonth =
-              dateToCheckDate.getDate() === startDateDate.getDate();
-
-            const diffInMonth = getDiffInMonth(startDateDate, dateToCheckDate);
-            return (
-              isCreationDayThisMonth &&
-              // start date is not in the future
-              diffInMonth >= 0 &&
-              diffInMonth % taskRepeatCfg.repeatEvery === 0
-            );
-          }
-
-          case 'YEARLY': {
-            if (!taskRepeatCfg.startDate) {
-              throw new Error('Repeat startDate needs to be defined for YEARLY');
-            }
-            if (+taskRepeatCfg.repeatEvery < 1) {
-              throw new Error('Invalid repeatEvery value given for YEARLY');
-            }
-            const startDateDate = new Date(taskRepeatCfg.startDate);
-            const isRightMonthAndDay =
-              dateToCheckDate.getDate() === startDateDate.getDate() &&
-              dateToCheckDate.getMonth() === startDateDate.getMonth();
-
-            const diffInYears =
-              dateToCheckDate.getFullYear() - startDateDate.getFullYear();
-
-            return (
-              isRightMonthAndDay &&
-              // start date is not in the future
-              diffInYears >= 0 &&
-              diffInYears % taskRepeatCfg.repeatEvery === 0
-            );
-          }
-        }
+        const rd = getNewestPossibleDueDate(taskRepeatCfg, dateToCheckDate);
+        return !!rd && isSameDay(rd, dateToCheckDate);
       })
     );
   },
 );
+
+export const selectTaskRepeatCfgsDueOnDayIncludingOverdue = createSelector(
+  selectAllTaskRepeatCfgs,
+  (
+    taskRepeatCfgs: TaskRepeatCfg[],
+    { dayDate }: { dayDate: number },
+  ): TaskRepeatCfg[] => {
+    const dateToCheckTimestamp = dayDate;
+    const dateToCheckDate = new Date(dateToCheckTimestamp);
+
+    return (
+      taskRepeatCfgs &&
+      taskRepeatCfgs.filter((taskRepeatCfg: TaskRepeatCfg) => {
+        if (
+          isSameDay(taskRepeatCfg.lastTaskCreation, dateToCheckTimestamp) ||
+          // also check for if future instance was already created via the work-view button
+          dateToCheckTimestamp < taskRepeatCfg.lastTaskCreation
+        ) {
+          return false;
+        }
+
+        const rd = getNewestPossibleDueDate(taskRepeatCfg, dateToCheckDate);
+        return !!rd;
+      })
+    );
+  },
+);
+
 export const selectTaskRepeatCfgByIdAllowUndefined = createSelector(
   selectTaskRepeatCfgFeatureState,
   (state: TaskRepeatCfgState, props: { id: string }): TaskRepeatCfg | undefined =>
@@ -202,6 +167,34 @@ export const taskRepeatCfgReducer = createReducer<TaskRepeatCfgState>(
       : oldState,
   ),
 
+  // delete all project tasks from tags on project delete
+  on(deleteProject, (state, { project, allTaskIds }) => {
+    const taskRepeatCfgs = state.ids.map((id) => state.entities[id] as TaskRepeatCfg);
+    const allCfgIdsForProject = taskRepeatCfgs.filter(
+      (cfg) => cfg.projectId === project.id,
+    );
+    return adapter.removeMany(
+      allCfgIdsForProject.map((repeatCfg) => repeatCfg.id),
+      state,
+    );
+
+    // const cfgsIdsToRemove: string[] = allCfgIdsForProject
+    //   .filter((cfg) => !cfg.tagIds || cfg.tagIds.length === 0)
+    //   .map((cfg) => cfg.id as string);
+    // if (cfgsIdsToRemove.length > 0) {
+    //   // this._taskRepeatCfgService.deleteTaskRepeatCfgsNoTaskCleanup(cfgsIdsToRemove);
+    //   return adapter.removeMany(cfgsIdsToRemove, state);
+    // }
+
+    // const cfgsToUpdate: string[] = allCfgIdsForProject
+    //   .filter((cfg) => cfg.tagIds && cfg.tagIds.length > 0)
+    //   .map((taskRepeatCfg) => taskRepeatCfg.id as string);
+    // if (cfgsToUpdate.length > 0) {
+    //   // this._taskRepeatCfgService.updateTaskRepeatCfgs(cfgsToUpdate, { projectId: null });
+    // }
+  }),
+
+  // INTERNAL
   on(addTaskRepeatCfgToTask, (state, { taskRepeatCfg }) =>
     adapter.addOne(taskRepeatCfg, state),
   ),

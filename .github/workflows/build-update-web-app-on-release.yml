@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Check out Git repository
         uses: actions/checkout@v4
         with:
@@ -28,13 +28,13 @@ jobs:
       - name: Install Node.js, NPM and Yarn
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
 
       - name: Get npm cache directory
         id: npm-cache-dir
         run: |
           echo "::set-output name=dir::$(npm config get cache)"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
@@ -52,18 +52,15 @@ jobs:
       - name: Test Unit
         run: npm run test
 
-      - name: Test E2E
-        run: npm run e2e
-
       - name: Build Frontend & Electron
         run: npm run buildFrontend:prodWeb
 
       - name: Deploy to Web Server
-        uses: easingthemes/ssh-deploy@v4.0.5
+        uses: easingthemes/ssh-deploy@v5.0.3
         env:
           SSH_PRIVATE_KEY: ${{ secrets.WEB_SERVER_SSH_KEY }}
           ARGS: '-rltgoDzvO --delete --exclude "news.json"'
-          SOURCE: 'dist/'
+          SOURCE: 'dist/browser/'
           REMOTE_HOST: ${{ secrets.WEB_REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.WEB_REMOTE_USER }}
           TARGET: ${{ secrets.WEB_REMOTE_TARGET }}

@@ -5,6 +5,8 @@
   [class.mat-elevation-z3]="!isElevated"
   [class.mat-elevation-z4]="isElevated"
   class="add-task-form"
+  matAutocompleteOrigin
+  #origin="matAutocompleteOrigin"
 >
   <div class="input-wrapper">
     <div
@@ -20,6 +22,9 @@
       (blur)="onBlur($event)"
       [formControl]="taskSuggestionsCtrl"
       [matAutocomplete]="autoEl"
+      [matAutocompleteConnectedTo]="origin"
+      [mention]="tagSuggestions"
+      [mentionConfig]="{triggerChar: '#', labelKey: 'title'}"
       spellcheck="false"
       [placeholder]="(doubleEnterCount > 0)
          ? (T.F.TASK.ADD_TASK_BAR.START|translate)
@@ -34,17 +39,21 @@
     />
 
     <div class="button-controls">
-      <button
-        (click)="isAddToBacklog=!isAddToBacklog"
-        [matTooltip]="T.F.TASK.ADD_TASK_BAR.TOGGLE_ADD_TO_BACKLOG_TODAY|translate"
-        matTooltipPosition="above"
-        class="switch-add-to-btn"
-        mat-icon-button
-        type="button"
+      <div
+        *ngIf="taskSuggestionsCtrl?.value?.length"
+        class="separator-box"
       >
-        <mat-icon *ngIf="isAddToBacklog">library_add</mat-icon>
-        <mat-icon *ngIf="!isAddToBacklog">playlist_add</mat-icon>
-      </button>
+        <button
+          class="switch-add-to-btn"
+          (mousedown)="addTask()"
+          type="submit"
+          mat-icon-button
+        >
+          <mat-icon *ngIf="activatedIssueTask">add_box</mat-icon>
+          <mat-icon *ngIf="!activatedIssueTask">add</mat-icon>
+        </button>
+      </div>
+
       <button
         (click)="isAddToBottom=!isAddToBottom"
         [matTooltip]="T.F.TASK.ADD_TASK_BAR.TOGGLE_ADD_TOP_OR_BOTTOM|translate"
@@ -56,6 +65,19 @@
         <mat-icon *ngIf="isAddToBottom">vertical_align_bottom</mat-icon>
         <mat-icon *ngIf="!isAddToBottom">vertical_align_top</mat-icon>
       </button>
+
+      <button
+        *ngIf="isAddToBacklogAvailable$|async"
+        (click)="isAddToBacklog=!isAddToBacklog"
+        [matTooltip]="T.F.TASK.ADD_TASK_BAR.TOGGLE_ADD_TO_BACKLOG_TODAY|translate"
+        matTooltipPosition="above"
+        class="switch-add-to-btn"
+        mat-icon-button
+        type="button"
+      >
+        <mat-icon *ngIf="isAddToBacklog">library_add</mat-icon>
+        <mat-icon *ngIf="!isAddToBacklog">playlist_add</mat-icon>
+      </button>
     </div>
   </div>
 
@@ -65,37 +87,39 @@
         *ngIf="!activatedIssueTask && !shortSyntaxTags.length"
         class="info-text"
       >
-        {{T.F.TASK.ADD_TASK_BAR.CREATE_TASK|translate}}
+        {{ T.F.TASK.ADD_TASK_BAR.CREATE_TASK|translate }}
       </div>
 
       <ng-container *ngIf="activatedIssueTask">
         <div
           *ngIf="activatedIssueTask.issueType"
-          class="info-text"
+          class="info-text add-existing"
         >
-          {{T.F.TASK.ADD_TASK_BAR.ADD_ISSUE_TASK|translate:{ issueType:
+          <mat-icon>playlist_add</mat-icon>
+          {{ T.F.TASK.ADD_TASK_BAR.ADD_ISSUE_TASK|translate:{ issueType:
           activatedIssueTask.issueType, issueNr: activatedIssueTask.taskIssueId ||
           activatedIssueTask.issueData?.id } }}
         </div>
         <div
           *ngIf="activatedIssueTask.issueType=== undefined"
-          class="info-text"
+          class="info-text add-existing"
         >
-          {{T.F.TASK.ADD_TASK_BAR.ADD_EXISTING_TASK|translate: { taskTitle:
+          <mat-icon>playlist_add</mat-icon>
+          {{ T.F.TASK.ADD_TASK_BAR.ADD_EXISTING_TASK|translate: { taskTitle:
           activatedIssueTask.title } }}
         </div>
       </ng-container>
 
       <ng-container *ngIf="!activatedIssueTask && shortSyntaxTags.length">
-        <tag
-          *ngFor="let shortSyntaxTag of shortSyntaxTags; trackBy: trackById"
-          [tag]="shortSyntaxTag"
-        ></tag>
+        @for (shortSyntaxTag of (shortSyntaxTags); track shortSyntaxTag.title ||
+        shortSyntaxTag) {
+        <tag [tag]="shortSyntaxTag"></tag>
+        }
       </ng-container>
     </ng-container>
 
     <ng-container *ngIf="inputVal.length === 0">
-      <div class="info-text">{{T.F.TASK.ADD_TASK_BAR.EXAMPLE|translate}}</div>
+      <div class="info-text">{{ T.F.TASK.ADD_TASK_BAR.EXAMPLE|translate }}</div>
     </ng-container>
   </div>
 
@@ -107,10 +131,9 @@
     (optionSelected)="addTask()"
     [displayWith]="displayWith"
   >
-    <mat-option
-      *ngFor="let item of (filteredIssueSuggestions$|async); trackBy:trackByFn"
-      [value]="item"
-    >
+    @for (item of (filteredIssueSuggestions$|async); track item.taskId || (item.issueData
+    && item.issueData.id)) {
+    <mat-option [value]="item">
       <mat-icon
         *ngIf="item.issueType"
         [svgIcon]="item.issueType|issueIcon"
@@ -119,8 +142,10 @@
       <tag
         *ngIf="item.ctx"
         [tag]="item.ctx"
+        [isHideTitle]="isHideTagTitles"
       ></tag>
       <span [innerHTML]="item?.titleHighlighted||item?.title"></span>
     </mat-option>
+    }
   </mat-autocomplete>
 </form>

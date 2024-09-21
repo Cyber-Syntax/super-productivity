@@ -38,6 +38,7 @@ import { Update } from '@ngrx/entity';
 import { getDateTimeFromClockString } from '../../../util/get-date-time-from-clock-string';
 import { isToday } from '../../../util/is-today.util';
 import { DateService } from 'src/app/core/date/date.service';
+import { deleteProject } from '../../project/store/project.actions';
 
 @Injectable()
 export class TaskRepeatCfgEffects {
@@ -51,6 +52,9 @@ export class TaskRepeatCfgEffects {
           upsertTaskRepeatCfg,
           deleteTaskRepeatCfg,
           deleteTaskRepeatCfgs,
+
+          // PROJECT
+          deleteProject,
         ),
         withLatestFrom(this._store$.pipe(select(selectTaskRepeatCfgFeatureState))),
         tap(this._saveToLs.bind(this)),
@@ -74,7 +78,7 @@ export class TaskRepeatCfgEffects {
       concatMap(
         () =>
           this._taskRepeatCfgService
-            .getRepeatTableTasksDueForDay$(
+            .getRepeatTableTasksDueForDayIncludingOverdue$(
               Date.now() - this._dateService.startOfNextDayDiff,
             )
             .pipe(first()),
@@ -83,7 +87,7 @@ export class TaskRepeatCfgEffects {
       filter((taskRepeatCfgs) => taskRepeatCfgs && !!taskRepeatCfgs.length),
       withLatestFrom(this._taskService.currentTaskId$),
 
-      // existing tasks with sub tasks are loaded, because need to move them to the archive
+      // existing tasks with sub-tasks are loaded, because need to move them to the archive
       mergeMap(([taskRepeatCfgs, currentTaskId]) => {
         // NOTE sorting here is important
         const sorted = taskRepeatCfgs.sort(sortRepeatableTaskCfgs);
@@ -91,7 +95,6 @@ export class TaskRepeatCfgEffects {
           mergeMap((taskRepeatCfg: TaskRepeatCfg) =>
             this._taskRepeatCfgService.getActionsForTaskRepeatCfg(
               taskRepeatCfg,
-              currentTaskId,
               Date.now() - this._dateService.startOfNextDayDiff,
             ),
           ),
@@ -207,7 +210,7 @@ export class TaskRepeatCfgEffects {
                       }
                     }
                     if (changes.tagIds) {
-                      this._taskService.updateTags(task, changes.tagIds, task.tagIds);
+                      this._taskService.updateTags(task, changes.tagIds);
                     }
                     if (changes.title || changes.notes) {
                       this._taskService.update(task.id, {

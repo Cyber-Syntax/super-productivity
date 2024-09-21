@@ -1,8 +1,9 @@
 import { IPC } from './shared-with-frontend/ipc-events.const';
 import { SyncGetRevResult } from '../src/app/imex/sync/sync.model';
-import { readFileSync, statSync, writeFileSync } from 'fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { error, log } from 'electron-log/main';
-import { ipcMain } from 'electron';
+import { dialog, ipcMain } from 'electron';
+import { getWin } from './main-window';
 
 export const initLocalFileSyncAdapter = (): void => {
   ipcMain.handle(
@@ -20,7 +21,11 @@ export const initLocalFileSyncAdapter = (): void => {
       },
     ): string | Error => {
       try {
+        console.log(IPC.FILE_SYNC_SAVE, filePath);
+        console.log('writeFileSync', filePath, !!dataStr);
+
         writeFileSync(filePath, dataStr);
+
         return getRev(filePath);
       } catch (e) {
         log('ERR: Sync error while writing to ' + filePath);
@@ -42,17 +47,20 @@ export const initLocalFileSyncAdapter = (): void => {
         localRev: string | null;
       },
     ): { rev: string; clientUpdate?: number } | SyncGetRevResult => {
-      try {
-        readFileSync(filePath);
-        return {
-          rev: getRev(filePath),
-        };
-      } catch (e) {
-        log('ERR: Sync error while getting meta for ' + filePath);
-        error(e);
-        // TODO improve
-        return 'NO_REMOTE_DATA';
-      }
+      throw new Error('REMOVE AS IMPLEMENTED OTHERWISE');
+      // try {
+      //   console.log(IPC.FILE_SYNC_GET_REV_AND_CLIENT_UPDATE, filePath, localRev);
+      //   console.log('getRev and stuuff');
+      //   readFileSync(filePath);
+      //   return {
+      //     rev: getRev(filePath),
+      //   };
+      // } catch (e) {
+      //   log('ERR: Sync error while getting meta for ' + filePath);
+      //   error(e);
+      //   // TODO improve
+      //   return 'NO_REMOTE_DATA';
+      // }
     },
   );
 
@@ -69,7 +77,9 @@ export const initLocalFileSyncAdapter = (): void => {
       },
     ): { rev: string; dataStr: string | undefined } | Error => {
       try {
+        console.log(IPC.FILE_SYNC_LOAD, filePath, localRev);
         const dataStr = readFileSync(filePath, { encoding: 'utf-8' });
+        console.log('READ ', dataStr.length);
         return {
           rev: getRev(filePath),
           dataStr,
@@ -81,9 +91,42 @@ export const initLocalFileSyncAdapter = (): void => {
       }
     },
   );
+
+  ipcMain.handle(
+    IPC.CHECK_DIR_EXISTS,
+    (
+      ev,
+      {
+        dirPath,
+      }: {
+        dirPath: string;
+      },
+    ): true | Error => {
+      try {
+        const r = readdirSync(dirPath);
+        console.log(r);
+        return true;
+      } catch (e) {
+        log('ERR: error while checking dir ' + dirPath);
+        error(e);
+        return new Error(e as string);
+      }
+    },
+  );
+
+  ipcMain.handle(IPC.PICK_DIRECTORY, async (): Promise<string | undefined> => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(getWin(), {
+      properties: ['openDirectory'],
+    });
+    if (canceled) {
+      return undefined;
+    } else {
+      return filePaths[0];
+    }
+  });
 };
 
 const getRev = (filePath: string): string => {
   const fileStat = statSync(filePath);
-  return fileStat.ctime.getTime().toString();
+  return fileStat.mtime.getTime().toString();
 };

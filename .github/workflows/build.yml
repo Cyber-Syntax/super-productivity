@@ -8,11 +8,13 @@ on:
 jobs:
   linux-bin-and-snap-release:
     runs-on: ubuntu-latest
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
 
     steps:
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Check out Git repository
         uses: actions/checkout@v4
         with:
@@ -27,7 +29,7 @@ jobs:
         id: npm-cache-dir
         run: |
           echo "::set-output name=dir::$(npm config get cache)"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
@@ -47,34 +49,41 @@ jobs:
 
       - name: Test E2E
         run: npm run e2e
+      - name: 'Upload E2E screenshots on failure'
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2eScreenshots
+          path: e2e/screenshots/**/*.*
+          retention-days: 5
 
       - name: Build Frontend & Electron
         run: npm run build
 
+      - name: Install Snapcraft
+        uses: samuelmeuli/action-snapcraft@v2
+
       - name: Build/Release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
+        uses: johannesjo/action-electron-builder@v1
         with:
           build_script_name: empty
           github_token: ${{ secrets.github_token }}
           release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
 
-      - name: Install Snapcraft
-        uses: samuelmeuli/action-snapcraft@v1
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
       # rename to possibly fix release issue
       - run: find ./app-builds -type f -name '*.snap' -exec sh -c 'x="{}"; mv "$x" "app-builds/sp.snap"' \;
       # Release to edge if no tag and to candidate if tag
-      - run: snapcraft push app-builds/sp.snap --release edge
+      - #otherwise it would be executed twice
         if: false == startsWith(github.ref, 'refs/tags/v')
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-      - run: snapcraft push app-builds/sp.snap --release candidate
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 2
+          timeout_minutes: 11
+          command: snapcraft push app-builds/sp.snap --release edge
+      #      - run: snapcraft push app-builds/sp.snap --release candidate
+      #        if: startsWith(github.ref, 'refs/tags/v')
+  #      - run: snapcraft promote superproductivity --from-channel latest/edge --to-channel latest/candidate --yes
+  #        if: startsWith(github.ref, 'refs/tags/v')
 
   mac-bin:
     runs-on: macos-latest
@@ -83,7 +92,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Echo is Release
         run: echo "IS_RELEASE $IS_RELEASE, ${{ startsWith(github.ref, 'refs/tags/v') }}"
         env:
@@ -103,13 +112,16 @@ jobs:
         id: npm-cache-dir
         run: |
           echo "::set-output name=dir::$(npm config get cache)"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
+      - name: Workaround for nx issue and dmg licence issue
+        run: npm install @nx/nx-darwin-arm64 dmg-license
 
       - name: Install npm Packages
         #  if: steps.npm-cache.outputs.cache-hit != 'true'
@@ -145,7 +157,7 @@ jobs:
         run: npm run build
 
       - name: Build/Release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
+        uses: johannesjo/action-electron-builder@v1
         with:
           build_script_name: empty
           github_token: ${{ secrets.github_token }}
@@ -164,10 +176,10 @@ jobs:
     steps:
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       # required because setting via env.TZ does not work on windows
       - name: Set timezone to Europe Standard Time
-        uses: szenius/set-timezone@v1.2
+        uses: szenius/set-timezone@v2.0
         with:
           timezoneWindows: 'W. Europe Standard Time'
 
@@ -185,13 +197,16 @@ jobs:
         id: npm-cache-dir
         run: |
           echo "::set-output name=dir::$(npm config get cache)"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
+      - name: Workaround for nx issue
+        run: npm install @nx/nx-win32-x64-msvc
 
       - name: Install npm Packages
         #  if: steps.npm-cache.outputs.cache-hit != 'true'
@@ -207,7 +222,7 @@ jobs:
         run: npm run build
 
       - name: Build/Release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
+        uses: johannesjo/action-electron-builder@v1
         with:
           build_script_name: empty
           github_token: ${{ secrets.github_token }}

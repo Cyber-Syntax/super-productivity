@@ -1,4 +1,9 @@
 {
+  "ANDROID": {
+    "NOTIFICATIONS": {
+      "SYNC_CONFLICT_TITLE": "یک تضاد همگام سازی رخ داد"
+    }
+  },
   "APP": {
     "B_INSTALL": {
       "IGNORE": "نادیده گرفتن",
@@ -197,26 +202,6 @@
       },
       "S": {
         "ERR_UNKNOWN": "GitLab: خطای ناشناخته {{statusCode}} {{errorMsg}}"
-      }
-    },
-    "GOOGLE": {
-      "BANNER": {
-        "AUTH_FAIL": "GoogleApi: تأیید هویت انجام نشد ، لطفاً دوباره وارد سیستم شوید!"
-      },
-      "DIALOG": {
-        "CREATE_SYNC_FILE": "Google Drive: No file with the name <strong>\"{{fileName}}\"</strong> was found. <strong>Create</strong> it as sync file on Google Drive?",
-        "USE_EXISTING_SYNC_FILE": "Google Drive: Use <strong>existing</strong> file <strong>\"{{fileName}}\"</strong> as sync file? If not please change the Sync file name."
-      },
-      "S": {
-        "MULTIPLE_SYNC_FILES_WITH_SAME_NAME": "Multiple files with the name \"{{newFileName}}\" found. Please delete all but one or choose a different name.",
-        "SYNC_FILE_CREATION_ERROR": "Google Drive: هنگام ایجاد پرونده همگام سازی خطایی رخ داد. {{err}}",
-        "UPDATED_SYNC_FILE_NAME": "Google Drive: نام فایل همگام سازی به روز شده است"
-      },
-      "S_API": {
-        "ERR": "خطای GoogleApi : {{errStr}}",
-        "ERR_NO_FILE_ID": "GoogleApi: آیدی فایل مشخص نشده است",
-        "ERR_NO_FILE_NAME": "GoogleApi: نام فایل مشخص نشده است",
-        "SUCCESS_LOGIN": "GoogleApi: ورود موفق به سیستم"
       }
     },
     "ISSUE": {
@@ -425,7 +410,6 @@
       "D_ADD": {
         "NOTE_LABEL": "متنی برای دخیره به عنوان یادداشت وارد کنید..."
       },
-      "EDIT_FULLSCREEN": "ویرایش در تمام صفحه",
       "NOTES_CMP": {
         "ADD_BTN": "اضافه کردن کار جدید",
         "DROP_TO_ADD": "برای اضافه کردن کارجدید اینجا رها کنید",
@@ -434,7 +418,8 @@
       "NOTE_CMP": {
         "DISABLE_PARSE": "Disable markdown parsing",
         "ENABLE_PARSE": "Enable markdown parse"
-      }
+      },
+      "EDIT_FULLSCREEN": "ویرایش در تمام صفحه"
     },
     "OPEN_PROJECT": {
       "DIALOG_INITIAL": {
@@ -655,12 +640,8 @@
           "L_ACCESS_TOKEN": "Access Token (تولید شده از کد Auth)"
         },
         "GOOGLE": {
-          "L_IS_COMPRESS_DATA": "فشرده سازی داده ها",
-          "L_SYNC_FILE_NAME": "نام پرونده همگام سازی کنید"
-        },
-        "LOCAL_FILE": {
-          "L_SYNC_FILE_PATH": "مسیر پرونده همگام سازی",
-          "L_SYNC_FILE_PATH_DESCRIPTION": "مسیر مطلق به پرونده که باید برای همگام سازی استفاده شود (ایجاد می شود)."
+          "L_SYNC_FILE_NAME": "نام پرونده همگام سازی کنید",
+          "L_IS_COMPRESS_DATA": "فشرده سازی داده ها"
         },
         "L_ENABLE_SYNCING": "همگام سازی را فعال کنید",
         "L_SYNC_INTERVAL": "فاصله همگام سازی",
@@ -670,8 +651,12 @@
           "CORS_INFO": "<strong>آزمایشی !!</strong> برای انجام این کار باید CORS را برای نمونه Nextcloud خود غیرفعال یا محدود کنید ، که این امر می تواند پیامدهای امنیتی منفی داشته باشد! لطفاً برای اطلاعات بیشتر <a href='https://github.com/nextcloud/server/issues/3131'>به این بخش مراجعه کنید</a> . با مسئولیت خود استفاده کنید!",
           "L_BASE_URL": "آدرس پایگاه",
           "L_PASSWORD": "کلمه عبور",
+          "L_USER_NAME": "نام کاربری",
+          "L_SYNC_FILE_PATH": "مسیر پرونده همگام سازی"
+        },
+        "LOCAL_FILE": {
           "L_SYNC_FILE_PATH": "مسیر پرونده همگام سازی",
-          "L_USER_NAME": "نام کاربری"
+          "L_SYNC_FILE_PATH_DESCRIPTION": "مسیر مطلق به پرونده که باید برای همگام سازی استفاده شود (ایجاد می شود)."
         }
       },
       "S": {
@@ -746,7 +731,7 @@
         "CONVERT_TO_PARENT_TASK": "تبدیل به کار اصلی",
         "DELETE": "Delete Task",
         "DROP_ATTACHMENT": "Drop here to attach to \"{{title}}\"",
-        "EDIT_REMINDER": "ویرایش یادآوری",
+        "EDIT_SCHEDULED": "ویرایش یادآوری",
         "EDIT_TAGS": "برچسب ها را ویرایش کنید",
         "MARK_DONE": "علامت زدن به عنوان انجام شده",
         "MARK_UNDONE": "علامت زدن به عنوان انجام نشده",
@@ -760,7 +745,7 @@
         "REPEAT_EDIT": "Edit repeat task config",
         "SCHEDULE": "Schedule task",
         "SHOW_UPDATES": "Show updates",
-        "TOGGLE_ADDITIONAL": "Show/Hide additional info",
+        "TOGGLE_DETAIL_PANEL": "Show/Hide additional info",
         "TOGGLE_ATTACHMENTS": "Show/Hide attachments",
         "TOGGLE_DONE": "Mark as done/undone",
         "TOGGLE_SUB_TASK_VISIBILITY": "Toggle sub task visibility",
@@ -768,11 +753,7 @@
         "TRACK_TIME_STOP": "Pause tracking time",
         "UPDATE_ISSUE_DATA": "Update issue data"
       },
-      "D_REMINDER_ADD": {
-        "CONFIRM_REPEAT_OK": "برنامه",
-        "CONFIRM_REPEAT_TXT": "شما سعی می کنید این کار مکرر را برای یک روز دیگر برنامه ریزی کنید. وظایف مکرر معمولاً در روزهای معین ایجاد می شوند و فقط در آن روز برنامه ریزی می شوند. آیا به هر حال می خواهید ادامه دهید؟",
-        "DATETIME_FOR": "تاریخ و زمان برای یادآوری",
-        "EDIT": "ویرایش یادآوری",
+      "D_SCHEDULE_TASK": {
         "MOVE_TO_BACKLOG": "Move task to backlog until scheduled",
         "REMIND_AT": "یادآوری در",
         "RO_10M": "10 دقیقه قبل از شروع آن",
@@ -781,8 +762,13 @@
         "RO_30M": "30 دقیقه قبل از شروع آن",
         "RO_5M": "5 دقیقه قبل از شروع آن",
         "RO_START": "وقتی شروع می شود",
+        "RO_NEVER": "Never",
         "SCHEDULE": "Schedule",
-        "UNSCHEDULE": "Unschedule"
+        "UNSCHEDULE": "Unschedule",
+        "CONFIRM_REPEAT_OK": "برنامه",
+        "CONFIRM_REPEAT_TXT": "شما سعی می کنید این کار مکرر را برای یک روز دیگر برنامه ریزی کنید. وظایف مکرر معمولاً در روزهای معین ایجاد می شوند و فقط در آن روز برنامه ریزی می شوند. آیا به هر حال می خواهید ادامه دهید؟",
+        "DATETIME_FOR": "تاریخ و زمان برای یادآوری",
+        "EDIT": "ویرایش یادآوری"
       },
       "D_REMINDER_VIEW": {
         "ADD_ALL_TO_TODAY": "همه را به امروز اضافه کنید",
@@ -874,21 +860,22 @@
         "WEDNESDAY": "چهارشنبه"
       }
     },
-    "TIMELINE": {
+    "SCHEDULE": {
       "CONTINUED": "ادامه داد",
       "D_INITIAL": {
         "TEXT": "<p>ایده جدول زمانی ارائه تصویر بهتری از نحوه انجام کارهای برنامه ریزی شده فرد در طول زمان است. این به طور خودکار از وظایف شما تولید می شود و دو چیز مختلف را از هم متمایز می کند: <strong>کارهای برنامه ریزی شده</strong>، که در زمان برنامه ریزی شده آنها نشان داده می شود و <strong>کارهای منظم</strong> که باید حول آن وقایع ثابت باشند. همه کارها تخمین زمانی را که به آنها اختصاص داده اید در نظر می گیرند.</p><p>علاوه بر این می توانید زمان شروع و پایان کار را نیز ارائه دهید. اگر کارهای منظم پیکربندی شده هرگز خارج از اینها نشان داده نشود. لطفاً توجه داشته باشید که این جدول زمانی فقط شامل 30 روز آینده است.</p>",
         "TITLE": "جدول زمانی"
       },
       "END": "پایان کار",
-      "MENU_TITLE": "جدول زمانی",
       "NOW": "اکنون",
       "NO_TASKS": "در حال حاضر هیچ وظیفه ای وجود ندارد. لطفاً برخی از کارها را از طریق دکمه + در نوار بالا اضافه کنید.",
+      "START": "شروع کار",
+      "TASK_PROJECTION_INFO": "پیش بینی آینده یک کار تکراری برنامه ریزی شده",
+      "LUNCH_BREAK": "استراحت ناهار",
+      "MENU_TITLE": "جدول زمانی",
       "S": {
         "CAL_PROVIDER_ERROR": "خط زمان خطای ارائه دهنده Cal: {{errTxt}}"
-      },
-      "START": "شروع کار",
-      "TASK_PROJECTION_INFO": "پیش بینی آینده یک کار تکراری برنامه ریزی شده"
+      }
     },
     "TIME_TRACKING": {
       "B": {
@@ -910,8 +897,8 @@
         "SIMPLE_COUNTER_TOOLTIP_DISABLE": "برای عدم ردیابی به {{title}}کلیک کنید",
         "SKIP": "رد شدن",
         "TASK": "کار",
-        "TASK_BREAK": "کار+استراحت",
-        "TRACK_TO": "تایین کنید:"
+        "TRACK_TO": "تایین کنید:",
+        "TASK_BREAK": "کار+استراحت"
       },
       "D_TRACKING_REMINDER": {
         "CREATE_AND_TRACK": "<em>ایجاد کنید</em> و پیگیری کنید",
@@ -976,6 +963,26 @@
         "NO_DATA": "هیچ کاری در این هفته انجام نشده است.",
         "TITLE": "عنوان"
       }
+    },
+    "GOOGLE": {
+      "BANNER": {
+        "AUTH_FAIL": "GoogleApi: تأیید هویت انجام نشد ، لطفاً دوباره وارد سیستم شوید!"
+      },
+      "DIALOG": {
+        "CREATE_SYNC_FILE": "Google Drive: No file with the name <strong>\"{{fileName}}\"</strong> was found. <strong>Create</strong> it as sync file on Google Drive?",
+        "USE_EXISTING_SYNC_FILE": "Google Drive: Use <strong>existing</strong> file <strong>\"{{fileName}}\"</strong> as sync file? If not please change the Sync file name."
+      },
+      "S": {
+        "MULTIPLE_SYNC_FILES_WITH_SAME_NAME": "Multiple files with the name \"{{newFileName}}\" found. Please delete all but one or choose a different name.",
+        "SYNC_FILE_CREATION_ERROR": "Google Drive: هنگام ایجاد پرونده همگام سازی خطایی رخ داد. {{err}}",
+        "UPDATED_SYNC_FILE_NAME": "Google Drive: نام فایل همگام سازی به روز شده است"
+      },
+      "S_API": {
+        "ERR": "خطای GoogleApi : {{errStr}}",
+        "ERR_NO_FILE_ID": "GoogleApi: آیدی فایل مشخص نشده است",
+        "ERR_NO_FILE_NAME": "GoogleApi: نام فایل مشخص نشده است",
+        "SUCCESS_LOGIN": "GoogleApi: ورود موفق به سیستم"
+      }
     }
   },
   "FILE_IMEX": {
@@ -985,13 +992,13 @@
   },
   "G": {
     "CANCEL": "لغو",
-    "CLICK_TO_EDIT": "برای ویرایش کلیک کنید",
     "CLOSE": "بستن",
     "DELETE": "حذف",
     "DISMISS": "رد کردن",
     "DO_IT": "انجام بدهید!",
     "EDIT": "ویرایش",
     "ENABLED": "فعال شده است",
+    "EXAMPLE_VAL": "برای ویرایش کلیک کنید",
     "EXTENSION_INFO": "لطفا برای ارتباط با جیرا و مدیریت زمان <a target=\"_blank\" href=\"https://chrome.google.com/webstore/detail/super-productivity/ljkbjodfmekklcoibdnhahlaalhihmlb\"> افزونه گوگل کروم</a> را دانلود کنید. توجه این افزونه برای نسخه موبایل کروم کار نمی کند.",
     "LOGIN": "وارد شدن",
     "LOGOUT": "خارج شدن",
@@ -1025,9 +1032,9 @@
       "HELP": "<div><p>When idle time handling is enabled a dialog will open after a specified amount of time to check if and on which task you want to track your time, when you have been idle.</p></div>",
       "IS_ENABLE_IDLE_TIME_TRACKING": "Enable idle time handling",
       "IS_ONLY_OPEN_IDLE_WHEN_CURRENT_TASK": "Only trigger idle time dialog when a current task is selected",
-      "IS_UN_TRACKED_IDLE_RESETS_BREAK_TIMER": "Untracked idle time resets take a break timer",
       "MIN_IDLE_TIME": "Trigger idle after X",
-      "TITLE": "Idle Handling"
+      "TITLE": "Idle Handling",
+      "IS_UN_TRACKED_IDLE_RESETS_BREAK_TIMER": "Untracked idle time resets take a break timer"
     },
     "IMEX": {
       "HELP": "<p>Here you can export all your data as a <strong>JSON</strong> for backups, but also to use it in a different context (e.g. you might want to export your projects in the browser and import them into the desktop version). </p> <p>The import expects valid JSON to be copied into the text area. <strong>NOTE: Once you hit the import button all your current settings and data will be overwritten!</strong></p>",
@@ -1047,7 +1054,7 @@
       "GO_TO_FOCUS_MODE": "رفتن به حالت تمرکز",
       "GO_TO_SCHEDULED_VIEW": "رفتن به وظایف برنامه ریزی شده",
       "GO_TO_SETTINGS": "رفتن به تنظیمات",
-      "GO_TO_TIMELINE": "به جدول زمانی بروید",
+      "GO_TO_SCHEDULE": "به جدول زمانی بروید",
       "GO_TO_WORK_VIEW": "رفتن به نمای کار",
       "HELP": "<p>Here you can configure all keyboard shortcuts.</p> <p>Click on the text input and enter the desired keyboard combination. Hit enter to save and Escape to abort.</p> <p>There are three types of shortcuts:</p> <ul> <li> <strong>Global shortcuts:</strong> When the app is running it will trigger the action from every other application. </li> <li> <strong>Application level shortcuts:</strong> Will trigger from every screen of the application, but not if you're currently editing a text field. </li> <li> <strong>Task level shortcuts:</strong> They will only trigger if you have selected a task via mouse or keyboard and usually trigger an action specifically related to that one task. </li> </ul>",
       "MOVE_TASK_DOWN": "Move Task down in List",
@@ -1060,6 +1067,7 @@
       "SHOW_SEARCH_BAR": "نمایش نوار جستجو",
       "SYSTEM_SHORTCUTS": "Global Shortcuts (system wide)",
       "TASK_ADD_SUB_TASK": "اضافه کردن کار فرعی",
+      "TASK_ADD_ATTACHMENT": "Attach file or link",
       "TASK_DELETE": "حذف کار",
       "TASK_EDIT_TAGS": "برچسب ها را ویرایش کنید",
       "TASK_EDIT_TITLE": "ویرایش عنوان",
@@ -1069,7 +1077,7 @@
       "TASK_SCHEDULE": "کار برنامه ریزی شده",
       "TASK_SHORTCUTS": "کارها",
       "TASK_SHORTCUTS_INFO": "The following shortcuts apply for the currently selected task (selected via tab or mouse).",
-      "TASK_TOGGLE_ADDITIONAL_INFO_OPEN": "نمایش دادن/پنهان کردن اطلاعات بیشتر در مورد کار",
+      "TASK_TOGGLE_DETAIL_PANEL_OPEN": "نمایش دادن/پنهان کردن اطلاعات بیشتر در مورد کار",
       "TASK_TOGGLE_DONE": "Toggle Done",
       "TITLE": "میانبرهای صفحه کلید",
       "TOGGLE_BACKLOG": "Show/Hide Task Backlog",
@@ -1080,44 +1088,23 @@
       "ZOOM_IN": "بزرگنمایی (فقط دسکتاپ)",
       "ZOOM_OUT": "کوچک نمایی (فقط دسکتاپ)"
     },
-    "LANG": {
-      "AR": "عربی",
-      "DE": "آلمانی",
-      "EN": "انگلیسی",
-      "ES": "اسپانیایی",
-      "FA": "فارسی",
-      "FR": "فرانسوی",
-      "IT": "ایتالیایی",
-      "JA": "ژاپنی",
-      "KO": "کره ای",
-      "LABEL": "لطفا یک زبان انتخاب کنید",
-      "NB": "نروژی",
-      "NL": "هلندی",
-      "PL": "لهستانی",
-      "PT": "پرتغالی",
-      "RU": "روسی",
-      "TITLE": "زبان",
-      "TR": "ترکی",
-      "ZH": "چینی ساده‌شده",
-      "ZH_TW": "چینی سنتی"
-    },
     "MISC": {
       "DEFAULT_PROJECT": "پروژه پیش فرض برای استفاده در کارها در صورت مشخص نبودن هیچ کدام",
       "FIRST_DAY_OF_WEEK": "روز اول هفته",
       "HELP": "<p><strong>Not seeing Desktop Notifications?</strong> For windows you might want to check System > Notifications & actions and check if the required notifications have been enabled.</p>",
       "IS_AUTO_ADD_WORKED_ON_TO_TODAY": "برچسب امروز به صورت خودکار به کار بر روی وظایف اضافه کنید",
       "IS_AUTO_MARK_PARENT_AS_DONE": "Mark parent task as done, when all sub tasks are done",
-      "IS_AUTO_START_NEXT_TASK": "هنگام علامت گذاری جریان ، به عنوان انجام کار ، ردیابی کار بعدی را شروع کنید",
       "IS_CONFIRM_BEFORE_EXIT": "Confirm before exiting the app",
       "IS_CONFIRM_BEFORE_EXIT_WITHOUT_FINISH_DAY": "قبل از خروج از برنامه بدون اتمام روز اول آن را تأیید کنید",
       "IS_DARK_MODE": "Dark Mode",
       "IS_HIDE_NAV": "Hide navigation until main header is hovered (desktop only)",
       "IS_MINIMIZE_TO_TRAY": "کوچک کردن به سینی (فقط دسک تاپ)",
-      "IS_NOTIFY_WHEN_TIME_ESTIMATE_EXCEEDED": "Notify when time estimate was exceeded",
       "IS_TRAY_SHOW_CURRENT_TASK": "نمایش وظیفه فعلی در منوی سینی / وضعیت (فقط دسک تاپ)",
       "IS_TURN_OFF_MARKDOWN": "Turn off markdown parsing for notes",
       "TASK_NOTES_TPL": "الگوی شرح کار",
-      "TITLE": "Misc Settings"
+      "TITLE": "Misc Settings",
+      "IS_AUTO_START_NEXT_TASK": "هنگام علامت گذاری جریان ، به عنوان انجام کار ، ردیابی کار بعدی را شروع کنید",
+      "IS_NOTIFY_WHEN_TIME_ESTIMATE_EXCEEDED": "Notify when time estimate was exceeded"
     },
     "POMODORO": {
       "BREAK_DURATION": "Duration of short breaks",
@@ -1136,9 +1123,9 @@
     "SOUND": {
       "DONE_SOUND": "وظیفه تمام شد صدا",
       "IS_INCREASE_DONE_PITCH": "برای انجام هر کاری سطح صدا را افزایش دهید",
-      "IS_PLAY_DONE_SOUND": "وقتی کار به پایان رسید ، صدا را پخش کنید",
       "TITLE": "صدا",
-      "VOLUME": "جلد"
+      "VOLUME": "جلد",
+      "IS_PLAY_DONE_SOUND": "وقتی کار به پایان رسید ، صدا را پخش کنید"
     },
     "TAKE_A_BREAK": {
       "HELP": "<div> <p>Allows you to configure a reoccurring reminder when you have worked for a specified amount of time without taking a break.</p> <p>You can modify the message displayed. ${duration} will be replaced with the time spent without a break.</p> </div>",
@@ -1152,17 +1139,17 @@
       "SNOOZE_TIME": "زمان استراحت را به تعویق بیندازید",
       "TITLE": "یادآوری استراحت"
     },
-    "TIMELINE": {
-      "CAL_PROVIDERS": "ارائه دهندگان تقویم (تجربی و اختیاری)",
-      "CAL_PROVIDERS_ADD": "منبع ical اضافه کنید",
-      "CAL_PROVIDERS_INFO": "می‌توانید به‌صورت اختیاری جدول زمانی را برای بارگیری و نمایش داده‌ها از iCal (مانند Google Calendar) پیکربندی کنید.",
-      "HELP": "ویژگی جدول زمانی باید مروری سریع درباره چگونگی انجام کارهای برنامه ریزی شده شما در طول زمان داشته باشد. می توانید آن را در فهرست سمت چپ در زیر <a href='#/timeline'>'Timeline'</a>پیدا کنید.",
-      "L_CAL_PATH": "مسیر URL/فایل برای تقویم ICAL (اختیاری)",
+    "SCHEDULE": {
+      "HELP": "ویژگی جدول زمانی باید مروری سریع درباره چگونگی انجام کارهای برنامه ریزی شده شما در طول زمان داشته باشد. می توانید آن را در فهرست سمت چپ در زیر <a href='#/schedule'>'Schedule'</a>پیدا کنید.",
       "L_IS_WORK_START_END_ENABLED": "جریان کار بدون برنامه را به زمانهای خاص کار محدود کنید",
       "L_WORK_END": "پایان روز کار",
       "L_WORK_START": "شروع روز کار",
       "TITLE": "جدول زمانی",
-      "WORK_START_END_DESCRIPTION": "به عنوان مثال، ساعت 17:00"
+      "WORK_START_END_DESCRIPTION": "به عنوان مثال، ساعت 17:00",
+      "CAL_PROVIDERS": "ارائه دهندگان تقویم (تجربی و اختیاری)",
+      "CAL_PROVIDERS_ADD": "منبع ical اضافه کنید",
+      "CAL_PROVIDERS_INFO": "می‌توانید به‌صورت اختیاری جدول زمانی را برای بارگیری و نمایش داده‌ها از iCal (مانند Google Calendar) پیکربندی کنید.",
+      "L_CAL_PATH": "مسیر URL/فایل برای تقویم ICAL (اختیاری)"
     },
     "TRACKING_REMINDER": {
       "HELP": "در صورتی که فراموش نکنید ردیابی زمان را شروع کنید ، یک بنر را پیکربندی کنید تا در آن نشان داده شود.",
@@ -1188,13 +1175,13 @@
     "DBX_GEN_TOKEN": "Dropbox: ایجاد نشانه ...",
     "DBX_META": "Dropbox: دریافت متا پرونده ...",
     "DBX_UPLOAD": "Dropbox: بارگذاری پرونده ...",
-    "GDRIVE_DOWNLOAD": "Google Drive: بارگیری فایل ...",
-    "GDRIVE_UPLOAD": "Google Drive: بارگذاری پرونده ...",
     "GITHUB_LOAD_ISSUE": "GitHub: بارگیری داده های شماره ...",
     "JIRA_LOAD_ISSUE": "جیرا: بارگیری داده های شماره ...",
     "UNKNOWN": "بارگیری داده های از راه دور",
     "WEB_DAV_DOWNLOAD": "WebDAV: در حال بارگیری داده ها ...",
-    "WEB_DAV_UPLOAD": "WebDAV: در حال بارگذاری داده ها ..."
+    "WEB_DAV_UPLOAD": "WebDAV: در حال بارگذاری داده ها ...",
+    "GDRIVE_DOWNLOAD": "Google Drive: بارگیری فایل ...",
+    "GDRIVE_UPLOAD": "Google Drive: بارگذاری پرونده ..."
   },
   "MH": {
     "ADD_NEW_TASK": "اضافه کردن کار جدید",
@@ -1202,7 +1189,6 @@
     "CREATE_TAG": "ایجاد برچسب",
     "DELETE_TAG": "برچسب را حذف کنید",
     "GO_TO_TASK_LIST": "به لیست کارها برو",
-    "MANAGE_PROJECTS": "مدیریت پروژه ها",
     "METRICS": "معیارها",
     "NOTES": "یادداشت ها",
     "PROCRASTINATE": "به تعویق انداختن",
@@ -1210,7 +1196,6 @@
     "PROJECT_MENU": "منوی پروژه",
     "PROJECT_SETTINGS": "تنظیمات پروژه",
     "QUICK_HISTORY": "تاریخچه سریع",
-    "SCHEDULED": "برنامه ریزی شده",
     "SETTINGS": "تنظیمات",
     "SHOW_SEARCH_BAR": "نمایش نوار جستجو",
     "TAGS": "برچسب ها",
@@ -1220,7 +1205,9 @@
     "TOGGLE_SHOW_NOTES": "Show/Hide Project Notes",
     "TOGGLE_TRACK_TIME": "Start/Stop tracking time",
     "TRIGGER_SYNC": "همگام سازی را به صورت دستی فعال کنید",
-    "WORKLOG": "گزارش کار"
+    "WORKLOG": "گزارش کار",
+    "MANAGE_PROJECTS": "مدیریت پروژه ها",
+    "SCHEDULED": "برنامه ریزی شده"
   },
   "PDS": {
     "BACK": "صبر کنید من چیزی را فراموش کردم!",
@@ -1233,10 +1220,8 @@
       "OK": "Aye aye! Shutdown!"
     },
     "ESTIMATE_TOTAL": "برآورد کل:",
-    "EVALUATION": "Evaluation",
     "EXPORT_TASK_LIST": "خروجی‌گرفتن از لیست کارها",
     "NO_TASKS": "There are no tasks for this day",
-    "PLAN": "Plan",
     "ROUND_15M": "Round all tasks to 15 minutes",
     "ROUND_30M": "Round all tasks to 30 minutes",
     "ROUND_5M": "Round all tasks to 5 minutes",
@@ -1250,43 +1235,16 @@
     "START_END": "شروع - پایان",
     "SUMMARY_FOR": "Daily Summary for {{dayStr}}",
     "TASKS_COMPLETED": "کارهای تکمیل شده",
-    "TASK_LIST": "Task List",
     "TIME_SPENT_AND_ESTIMATE_LABEL": "زمان سپری‌شده/تخمین",
     "TIME_SPENT_ESTIMATE_TITLE": "Time Spent: Total time spent today. Archived tasks not included. – Time Estimated: Time estimated for tasks worked on today minus the time already spent with them on other days.",
-    "TODAY": "امروز",
-    "WEEK": "Week"
+    "WEEK": "Week",
+    "EVALUATION": "Evaluation",
+    "PLAN": "Plan",
+    "TASK_LIST": "Task List",
+    "TODAY": "امروز"
   },
   "PM": {
     "TITLE": "معیارهای پروژه"
-  },
-  "PP": {
-    "ARCHIVED_PROJECTS": "Archived Projects",
-    "ARCHIVE_PROJECT": "Archive Project",
-    "CLICK_TO_HIDE": "برای مخفی کردن پروژه از منو کلیک کنید",
-    "CLICK_TO_SHOW": "برای نمایش پروژه در منو کلیک کنید",
-    "DELETE_PROJECT": "Delete Project",
-    "D_CONFIRM_ARCHIVE": {
-      "MSG": "Are you sure you want to archive this project? Archived Projects will not be shown in the menu any more and you can't access any of their data without restoring them. It's recommended that you backup your data before you do this.",
-      "OK": "Archive"
-    },
-    "D_CONFIRM_DELETE": {
-      "MSG": "Are you sure you want to delete this project? It's recommended to backup your data before you do this.",
-      "OK": "Delete"
-    },
-    "D_CONFIRM_UNARCHIVE": {
-      "MSG": "Are you sure you want to unarchive this project?",
-      "OK": "Unarchive"
-    },
-    "EDIT_PROJECT": "ویرایش پروژه",
-    "EXPORT_PROJECT": "Export Project",
-    "GITHUB_CONFIGURED": "GitHub Integration Configured",
-    "GITLAB_CONFIGURED": "GitLab Integration Configured",
-    "IMPORT_FROM_FILE": "Import from file",
-    "JIRA_CONFIGURED": "Jira Integration Configured",
-    "OPEN_PROJECT_CONFIGURED": "OpenProject Integration پیکربندی شده است",
-    "S_INVALID_JSON": "Invalid json for project file",
-    "TITLE": "Project Overview",
-    "UN_ARCHIVE_PROJECT": "Unarchive Project"
   },
   "PS": {
     "GLOBAL_SETTINGS": "تنظیمات عمومی",
@@ -1347,5 +1305,34 @@
     "TIME_ESTIMATED": "تخمین زمان:",
     "WITHOUT_BREAK": "بدون استراحت:",
     "WORKING_TODAY": "کار امروز:"
+  },
+  "PP": {
+    "ARCHIVED_PROJECTS": "Archived Projects",
+    "ARCHIVE_PROJECT": "Archive Project",
+    "CLICK_TO_HIDE": "برای مخفی کردن پروژه از منو کلیک کنید",
+    "CLICK_TO_SHOW": "برای نمایش پروژه در منو کلیک کنید",
+    "DELETE_PROJECT": "Delete Project",
+    "D_CONFIRM_ARCHIVE": {
+      "MSG": "Are you sure you want to archive this project? Archived Projects will not be shown in the menu any more and you can't access any of their data without restoring them. It's recommended that you backup your data before you do this.",
+      "OK": "Archive"
+    },
+    "D_CONFIRM_DELETE": {
+      "MSG": "Are you sure you want to delete this project? It's recommended to backup your data before you do this.",
+      "OK": "Delete"
+    },
+    "D_CONFIRM_UNARCHIVE": {
+      "MSG": "Are you sure you want to unarchive this project?",
+      "OK": "Unarchive"
+    },
+    "EDIT_PROJECT": "ویرایش پروژه",
+    "EXPORT_PROJECT": "Export Project",
+    "GITHUB_CONFIGURED": "GitHub Integration Configured",
+    "GITLAB_CONFIGURED": "GitLab Integration Configured",
+    "IMPORT_FROM_FILE": "Import from file",
+    "JIRA_CONFIGURED": "Jira Integration Configured",
+    "OPEN_PROJECT_CONFIGURED": "OpenProject Integration پیکربندی شده است",
+    "S_INVALID_JSON": "Invalid json for project file",
+    "TITLE": "Project Overview",
+    "UN_ARCHIVE_PROJECT": "Unarchive Project"
   }
 }

@@ -38,12 +38,15 @@ import { TagService } from '../../tag/tag.service';
 import { ProjectService } from '../../project/project.service';
 import { Tag } from '../../tag/tag.model';
 import { Project } from '../../project/project.model';
-import { shortSyntaxToTags } from './short-syntax-to-tags';
+import { ShortSyntaxTag, shortSyntaxToTags } from './short-syntax-to-tags';
 import { slideAnimation } from '../../../ui/animations/slide.ani';
 import { blendInOutAnimation } from 'src/app/ui/animations/blend-in-out.ani';
 import { fadeAnimation } from '../../../ui/animations/fade.ani';
 import { SS } from '../../../core/persistence/storage-keys.const';
 import { IS_ANDROID_WEB_VIEW } from '../../../util/is-android-web-view';
+import { Store } from '@ngrx/store';
+import { PlannerActions } from '../../planner/store/planner.actions';
+import { getWorklogStr } from '../../../util/get-work-log-str';
 
 @Component({
   selector: 'add-task-bar',
@@ -58,7 +61,9 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
   @Input() isAddToBottom: boolean = false;
   @Input() isDoubleEnterMode: boolean = false;
   @Input() isElevated: boolean = false;
+  @Input() isHideTagTitles: boolean = false;
   @Input() isDisableAutoFocus: boolean = false;
+  @Input() planForDay?: string;
   @Output() blurred: EventEmitter<any> = new EventEmitter();
   @Output() done: EventEmitter<any> = new EventEmitter();
 
@@ -106,40 +111,55 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
     new BehaviorSubject<AddTaskSuggestion | null>(null);
   activatedIssueTask: AddTaskSuggestion | null = null;
 
-  shortSyntaxTags: {
-    title: string;
-    color: string;
-    icon: string;
-  }[] = [];
-  shortSyntaxTags$: Observable<
-    {
-      title: string;
-      color: string;
-      icon: string;
-    }[]
-  > = this.taskSuggestionsCtrl.valueChanges.pipe(
-    filter((val) => typeof val === 'string'),
-    withLatestFrom(
-      this._tagService.tags$,
-      this._projectService.list$,
-      this._workContextService.activeWorkContext$,
-    ),
-    map(([val, tags, projects, activeWorkContext]) =>
-      shortSyntaxToTags({
-        val,
-        tags,
-        projects,
-        defaultColor: activeWorkContext.theme.primary,
-      }),
-    ),
-    startWith([]),
-  );
+  shortSyntaxTags: ShortSyntaxTag[] = [];
+  shortSyntaxTags$: Observable<ShortSyntaxTag[]> =
+    this.taskSuggestionsCtrl.valueChanges.pipe(
+      filter((val) => typeof val === 'string'),
+      withLatestFrom(
+        this._tagService.tags$,
+        this._projectService.list$,
+        this._workContextService.activeWorkContext$,
+      ),
+      map(([val, tags, projects, activeWorkContext]) =>
+        shortSyntaxToTags({
+          val,
+          tags,
+          projects,
+          defaultColor: activeWorkContext.theme.primary,
+        }),
+      ),
+      startWith([]),
+    );
 
   inputVal: string = '';
   inputVal$: Observable<string> = this.taskSuggestionsCtrl.valueChanges;
 
+  tagSuggestions$: Observable<Tag[]> = this._tagService.tagsNoMyDayAndNoList$;
+  tagSuggestions: Tag[] = [];
+
+  isAddToBacklogAvailable$: Observable<boolean> =
+    this._workContextService.activeWorkContext$.pipe(map((ctx) => !!ctx.isEnableBacklog));
+
+  // isAddToBacklogAvailable$: Observable<boolean> = this.shortSyntaxTags$.pipe(
+  //   switchMap((shortSyntaxTags) => {
+  //     const shortSyntaxProjectId =
+  //       shortSyntaxTags.length &&
+  //       shortSyntaxTags.find((tag: ShortSyntaxTag) => tag.projectId)?.projectId;
+  //
+  //     if (typeof shortSyntaxProjectId === 'string') {
+  //       return this._projectService
+  //         .getByIdOnce$(shortSyntaxProjectId)
+  //         .pipe(map((project) => project.isEnableBacklog));
+  //     }
+  //
+  //     return this._workContextService.activeWorkContext$.pipe(
+  //       map((ctx) => !!ctx.isEnableBacklog),
+  //     );
+  //   }),
+  // );
+
   private _isAddInProgress?: boolean;
-  private _blurTimeout?: number;
+  private _delayBlurTimeout?: number;
   private _autofocusTimeout?: number;
   private _attachKeyDownHandlerTimeout?: number;
   private _saveTmpTodoTimeout?: number;
@@ -154,30 +174,20 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
     private _projectService: ProjectService,
     private _tagService: TagService,
     private _cd: ChangeDetectorRef,
+    private _store: Store,
   ) {
     this._subs.add(
       this.activatedIssueTask$.subscribe((v) => (this.activatedIssueTask = v)),
     );
     this._subs.add(this.shortSyntaxTags$.subscribe((v) => (this.shortSyntaxTags = v)));
     this._subs.add(this.inputVal$.subscribe((v) => (this.inputVal = v)));
+    this._subs.add(this.tagSuggestions$.subscribe((v) => (this.tagSuggestions = v)));
   }
 
   ngAfterViewInit(): void {
-    // for android we need to make sure that a focus event is called to open the keyboard
+    this.isAddToBottom = !!this.planForDay || this.isAddToBottom;
     if (!this.isDisableAutoFocus) {
-      if (IS_ANDROID_WEB_VIEW) {
-        document.body.focus();
-        (this.inputEl as ElementRef).nativeElement.focus();
-        this._autofocusTimeout = window.setTimeout(() => {
-          document.body.focus();
-          (this.inputEl as ElementRef).nativeElement.focus();
-        }, 1000);
-      } else {
-        // for non mobile we don't need this, since it's much faster
-        this._autofocusTimeout = window.setTimeout(() => {
-          (this.inputEl as ElementRef).nativeElement.focus();
-        });
-      }
+      this._focusInput();
     }
 
     this._attachKeyDownHandlerTimeout = window.setTimeout(() => {
@@ -186,12 +196,14 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
         (ev: KeyboardEvent) => {
           if (ev.key === 'Escape') {
             this.blurred.emit();
+            // needs to be set otherwise the activatedIssueTask won't reflect the task that is added
+            this.activatedIssueTask$.next(null);
           } else if (ev.key === '1' && ev.ctrlKey) {
-            this.isAddToBacklog = !this.isAddToBacklog;
+            this.isAddToBottom = !this.isAddToBottom;
             this._cd.detectChanges();
             ev.preventDefault();
           } else if (ev.key === '2' && ev.ctrlKey) {
-            this.isAddToBottom = !this.isAddToBottom;
+            this.isAddToBacklog = !this.isAddToBacklog;
             this._cd.detectChanges();
             ev.preventDefault();
           }
@@ -211,8 +223,8 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this._blurTimeout) {
-      window.clearTimeout(this._blurTimeout);
+    if (this._delayBlurTimeout) {
+      window.clearTimeout(this._delayBlurTimeout);
     }
     if (this._attachKeyDownHandlerTimeout) {
       window.clearTimeout(this._attachKeyDownHandlerTimeout);
@@ -230,10 +242,6 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
     this._subs.unsubscribe();
   }
 
-  closeBtnClose(ev: Event): void {
-    this.blurred.emit(ev);
-  }
-
   onOptionActivated(val: any): void {
     this.activatedIssueTask$.next(val);
   }
@@ -241,6 +249,8 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
   onBlur(ev: FocusEvent): void {
     const relatedTarget: HTMLElement = ev.relatedTarget as HTMLElement;
     let isUIelement = false;
+
+    // NOTE: related target is null for all elements that are not focusable (e.g. items without tabindex, non-buttons, non-inputs etc.)
     if (relatedTarget) {
       const { className } = relatedTarget;
       isUIelement =
@@ -249,39 +259,32 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
         className.includes('shepherd-enabled');
     }
 
-    if (
-      !relatedTarget ||
-      (relatedTarget && !relatedTarget.className.includes('close-btn') && !isUIelement)
-    ) {
+    if (!relatedTarget || (relatedTarget && !isUIelement)) {
       sessionStorage.setItem(
         SS.TODO_TMP,
         (this.inputEl as ElementRef).nativeElement.value,
       );
     }
+
     if (relatedTarget && isUIelement) {
       (this.inputEl as ElementRef).nativeElement.focus();
-    } else if (relatedTarget && relatedTarget.className.includes('mat-option')) {
-      this._blurTimeout = window.setTimeout(() => {
-        if (!this._isAddInProgress) {
+    } else {
+      // we need to wait since otherwise addTask is not working
+      this._delayBlurTimeout = window.setTimeout(() => {
+        if (this._isAddInProgress) {
+          this._delayBlurTimeout = window.setTimeout(() => {
+            this.blurred.emit(ev);
+          }, 300);
+        } else {
           this.blurred.emit(ev);
         }
-      }, 300);
-    } else {
-      this.blurred.emit(ev);
+      }, 220);
     }
   }
 
   displayWith(issue?: JiraIssue): string | undefined {
     // NOTE: apparently issue can be undefined for displayWith
     return issue?.summary;
-  }
-
-  trackByFn(i: number, item: AddTaskSuggestion): string | number | undefined {
-    return item.taskId || (item.issueData && item.issueData.id);
-  }
-
-  trackById(i: number, item: any): string {
-    return item.id;
   }
 
   async addTask(): Promise<void> {
@@ -309,11 +312,10 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
     } else if (item.taskId && item.isFromOtherContextAndTagOnlySearch) {
       this._lastAddedTaskId = item.taskId;
       const task = await this._taskService.getByIdOnce$(item.taskId).toPromise();
-      this._taskService.updateTags(
-        task,
-        [...task.tagIds, this._workContextService.activeWorkContextId as string],
-        task.tagIds,
-      );
+      this._taskService.updateTags(task, [
+        ...task.tagIds,
+        this._workContextService.activeWorkContextId as string,
+      ]);
 
       this._snackService.open({
         ico: 'playlist_add',
@@ -375,8 +377,36 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
       }
     }
 
+    if (this._lastAddedTaskId) {
+      this._planForDayAfterAddTaskIfConfigured(this._lastAddedTaskId);
+    }
+
+    if (this.planForDay) {
+      this.blurred.emit();
+    } else {
+      this._focusInput();
+    }
+
     this.taskSuggestionsCtrl.setValue('');
     this._isAddInProgress = false;
+    sessionStorage.setItem(SS.TODO_TMP, '');
+  }
+
+  private _planForDayAfterAddTaskIfConfigured(taskId: string): void {
+    const planForDay = this.planForDay;
+    if (planForDay) {
+      this._taskService.getByIdOnce$(taskId).subscribe((task) => {
+        if (getWorklogStr() !== planForDay) {
+          this._store.dispatch(
+            PlannerActions.planTaskForDay({
+              task: task,
+              day: planForDay,
+              isAddToTop: !this.isAddToBottom,
+            }),
+          );
+        }
+      });
+    }
   }
 
   private async _getCtxForTaskSuggestion({
@@ -391,6 +421,23 @@ export class AddTaskBarComponent implements AfterViewInit, OnDestroy {
         throw new Error('No first tag');
       }
       return await this._tagService.getTagById$(firstTagId).pipe(first()).toPromise();
+    }
+  }
+
+  private _focusInput(): void {
+    // for android we need to make sure that a focus event is called to open the keyboard
+    if (IS_ANDROID_WEB_VIEW) {
+      document.body.focus();
+      (this.inputEl as ElementRef).nativeElement.focus();
+      this._autofocusTimeout = window.setTimeout(() => {
+        document.body.focus();
+        (this.inputEl as ElementRef).nativeElement.focus();
+      }, 1000);
+    } else {
+      // for non mobile we don't need this, since it's much faster
+      this._autofocusTimeout = window.setTimeout(() => {
+        (this.inputEl as ElementRef).nativeElement.focus();
+      });
     }
   }
 

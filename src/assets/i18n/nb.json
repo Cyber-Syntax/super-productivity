@@ -6,12 +6,12 @@
       "MSG": "Vil du installere Super Productivity som en PWA?"
     },
     "B_OFFLINE": "Du er koblet fra internett. Synkronisering og å be om data fra leverandører fungerer ikke.",
-    "D_INITIAL": {
-      "TITLE": "Velkommen til v {{nr}}"
-    },
     "UPDATE_MAIN_MODEL": "Super Productivity har fått en stor oppdatering! Noen migrasjoner for dataene dine er påkrevd. Vær oppmerksom på at dette gjør dataene dine uforenlige med eldre versjoner av appen.",
     "UPDATE_MAIN_MODEL_NO_UPDATE": "Ingen modelloppdatering valgt. Vær oppmerksom på at du må nedgradere til den siste versjonen, hvis du ikke vil utføre modelloppgraderingen.",
-    "UPDATE_WEB_APP": "Ny versjon tilgjengelig. Last inn ny versjon?"
+    "UPDATE_WEB_APP": "Ny versjon tilgjengelig. Last inn ny versjon?",
+    "D_INITIAL": {
+      "TITLE": "Velkommen til v {{nr}}"
+    }
   },
   "BL": {
     "NO_TASKS": "Det er for øyeblikket ingen oppgaver i backloggen"
@@ -19,8 +19,8 @@
   "CONFIRM": {
     "AUTO_FIX": "Dataene dine ser ut til å være skadet. Vil du prøve å fikse det automatisk? Dette kan føre til delvis tap av data.",
     "DELETE_STRAY_BACKUP": "Vil du slette sikkerhetskopien for å unngå å se denne dialogen?",
-    "RESTORE_STRAY_BACKUP": "Under siste synkronisering kan det ha oppstått en feil. Vil du gjenopprette den siste sikkerhetskopien?",
-    "RESTORE_FILE_BACKUP": "Det ser ut til å være INGEN DATA, men det er sikkerhetskopier tilgjengelig på \"{{dir}}\". Vil du gjenopprette den siste sikkerhetskopien fra {{from}}?"
+    "RESTORE_FILE_BACKUP": "Det ser ut til å være INGEN DATA, men det er sikkerhetskopier tilgjengelig på \"{{dir}}\". Vil du gjenopprette den siste sikkerhetskopien fra {{from}}?",
+    "RESTORE_STRAY_BACKUP": "Under siste synkronisering kan det ha oppstått en feil. Vil du gjenopprette den siste sikkerhetskopien?"
   },
   "DATETIME_INPUT": {
     "IN": "om {{time}}",
@@ -83,6 +83,14 @@
       }
     },
     "DROPBOX": {
+      "S": {
+        "ACCESS_TOKEN_ERROR": "Dropbox: Kan ikke generere Access Token fra Auth Code",
+        "ACCESS_TOKEN_GENERATED": "Dropbox: Access Token generert fra Auth Code",
+        "AUTH_ERROR": "Dropbox: Ugyldig tilgangstoken gitt",
+        "OFFLINE": "Dropbox: Kan ikke synkroniseres, fordi offline",
+        "SYNC_ERROR": "Dropbox: Feil under synkronisering",
+        "UNKNOWN_ERROR": "Dropbox: Ukjent feil: {{errorStr}}"
+      },
       "C": {
         "EMPTY_SYNC": "Du prøver å synkronisere et tomt dataobjekt. Er dette din aller første synkronisering av en (nesten) ubrukt app?",
         "FORCE_IMPORT": "Importere eksterne data uansett?",
@@ -109,14 +117,6 @@
         "L_ENABLE_SYNCING": "Aktiver Dropbox-synkronisering",
         "L_SYNC_INTERVAL": "Synkroniseringsintervall",
         "TITLE": "Synkroniser via Dropbox (anbefalt)"
-      },
-      "S": {
-        "ACCESS_TOKEN_ERROR": "Dropbox: Kan ikke generere Access Token fra Auth Code",
-        "ACCESS_TOKEN_GENERATED": "Dropbox: Access Token generert fra Auth Code",
-        "AUTH_ERROR": "Dropbox: Ugyldig tilgangstoken gitt",
-        "OFFLINE": "Dropbox: Kan ikke synkroniseres, fordi offline",
-        "SYNC_ERROR": "Dropbox: Feil under synkronisering",
-        "UNKNOWN_ERROR": "Dropbox: Ukjent feil: {{errorStr}}"
       }
     },
     "GITHUB": {
@@ -146,9 +146,9 @@
         "WRITE_A_COMMENT": "Skriv en kommentar"
       },
       "S": {
+        "ERR_UNKNOWN": "GitHub: Ukjent feil {{statusCode}} {{errorMsg}}. Grensen for api-rate overskredet?",
         "ERR_NETWORK": "GitHub: Forespørselen mislyktes på grunn av en nettverksfeil på klientsiden",
         "ERR_NOT_CONFIGURED": "GitHub: Er ikke riktig konfigurert",
-        "ERR_UNKNOWN": "GitHub: Ukjent feil {{statusCode}} {{errorMsg}}. Grensen for api-rate overskredet?",
         "IMPORTED_MULTIPLE_ISSUES": "GitHub: Importerte {{issuesLength}} nye problemer fra git til backlog",
         "IMPORTED_SINGLE_ISSUE": "GitHub: Importert problem \"{{issueText}}\" fra git til backlog",
         "ISSUE_DELETED_OR_CLOSED": "GitHub: Utgaven \"{{issueText}}\" ser ut til å bli slettet eller lukket på git",
@@ -188,9 +188,9 @@
         "WRITE_A_COMMENT": "Skriv en kommentar"
       },
       "S": {
+        "ERR_UNKNOWN": "GitLab: Ukjent feil {{statusCode}} {{errorMsg}}",
         "ERR_NETWORK": "GitLab: Forespørselen mislyktes på grunn av en nettverksfeil på klientsiden",
         "ERR_NOT_CONFIGURED": "GitLab: Er ikke riktig konfigurert",
-        "ERR_UNKNOWN": "GitLab: Ukjent feil {{statusCode}} {{errorMsg}}",
         "IMPORTED_MULTIPLE_ISSUES": "GitLab: Importerte {{issuesLength}} nye problemer fra git til backlog",
         "IMPORTED_SINGLE_ISSUE": "GitLab: Importert problem \"{{issueText}}\" fra git til backlog",
         "ISSUE_DELETED_OR_CLOSED": "GitLab: Utgaven \"{{issueText}}\" ser ut til å være slettet eller lukket på git",
@@ -201,67 +201,6 @@
         "NEW_COMMENT": "GitLab: Ny kommentar til \"{{issueText}}\"",
         "POLLING": "GitLab: Henter endringer for problemer",
         "SHOW_ISSUE_BTN": "Vis meg"
-      }
-    },
-    "GOOGLE": {
-      "BANNER": {
-        "AUTH_FAIL": "GoogleApi: Kunne ikke autentisere, prøv å logge på igjen!"
-      },
-      "DIALOG": {
-        "CREATE_SYNC_FILE": "Google Disk: Ingen fil med navnet <strong>&quot;{{fileName}}&quot;</strong> ble funnet. <strong>Vil du opprette</strong> den som synkroniseringsfil på Google Disk?",
-        "USE_EXISTING_SYNC_FILE": "Google Drive: Bruk <strong>eksisterende</strong> fil <strong>&quot;{{fileName}}&quot;</strong> som synkroniseringsfil? Hvis ikke, kan du endre synkroniseringsfilnavnet."
-      },
-      "D_CONFIRM_LOAD": {
-        "LAST_MOD": "siste modifikasjon:",
-        "LAST_SYNC": "siste synkronisering",
-        "LOCAL": "lokal",
-        "LOCAL_REMOTE": "lokal <=> ekstern",
-        "OVERWRITE_LOCAL": "Overskriv lokal",
-        "OVERWRITE_REMOTE": "Overskriv ekstern",
-        "REMOTE": "ekstern",
-        "TEXT": "<p>Oppdatering fra Google Drive Backup. Både lokale og eksterne data ser ut til å være endret. Vil du overskrive ikke-lagrede lokale endringer? <strong>All data vil gå tapt for alltid</strong>.</p>",
-        "TITLE": "Overskrive lokale data med GDrive Update?"
-      },
-      "D_CONFIRM_SAVE": {
-        "LAST_MOD": "siste modifikasjon:",
-        "LAST_SYNC": "siste synkronisering",
-        "LOCAL": "lokal",
-        "LOCAL_REMOTE": "lokal <=> ekstern",
-        "OVERWRITE_LOCAL": "Overskriv lokal",
-        "OVERWRITE_REMOTE": "Overskriv ekstern",
-        "REMOTE": "ekstern",
-        "TEXT": "<p>Det ser ut til å være noen endringer på Google Drive som du ikke har lokalt. Vil du overskrive dem uansett?</p>",
-        "TITLE": "Vil du overskrive ikke lagrede data på Google Disk?"
-      },
-      "S": {
-        "DOWNLOADING_UPDATE": "Google Drive: Det er en ekstern oppdatering! Laster ned ...",
-        "ERROR": "Google Disk - Feil: {{errTxt}}",
-        "ERROR_INITIAL_IMPORT": "Google Disk: Feil under forsøk på å importere data i utgangspunktet",
-        "LOCAL_UP_TO_DATE": "Google Drive: Lokale data er allerede oppdatert",
-        "MULTIPLE_SYNC_FILES_WITH_SAME_NAME": "Flere filer med navnet \"{{newFileName}}\" funnet. Slett alle unntatt en, eller velg et annet navn.",
-        "NO_UPDATE_REQUIRED": "Google Drive: Ingen oppdatering nødvendig",
-        "REMOTE_UP_TO_DATE": "Google Drive: Eksterne data er allerede oppdatert",
-        "SUCCESS_IMPORT": "Google Drive: Lagret sikkerhetskopi",
-        "SYNCING": "Google Drive: Synkronisering"
-      },
-      "SYNC_CFG": {
-        "AUTO_LOGIN": "Automatisk pålogging når du starter appen",
-        "AUTO_SYNC": "Automatisk synkronisering av data til ekstern",
-        "BACKUP_NOW": "Sikkerhetskopier nå",
-        "COMPRESS": "Komprimer data",
-        "ENABLE": "Aktiver synkronisering via Google Disk",
-        "LOAD_FROM": "Last fra GDrive",
-        "LOAD_ON_STARTUP": "Last inn eksterne data ved oppstart",
-        "NOTIFY": "Varsle når du synkroniserer",
-        "SYNC_FILE_NAME": "Synkroniser filnavn",
-        "SYNC_INTERVAL": "Synkroniseringsintervall",
-        "UPDATE_SYNC_FILE": "Oppdater synkroniseringsfil"
-      },
-      "S_API": {
-        "ERR": "GoogleApi-feil: {{errStr}}",
-        "ERR_NO_FILE_ID": "GoogleApi: Ingen fil-ID er spesifisert",
-        "ERR_NO_FILE_NAME": "GoogleApi: Ingen filnavn er spesifisert",
-        "SUCCESS_LOGIN": "GoogleApi: Innlogging vellykket"
       }
     },
     "JIRA": {
@@ -365,21 +304,21 @@
       "S": {
         "ADDED_WORKLOG_FOR": "Jira: Lagt til arbeidslogg for {{issueKey}}",
         "EXTENSION_NOT_LOADED": "Super Productivity Extension ikke lastet inn. Det kan hjelpe å laste siden inn på nytt",
-        "IMPORTED_MULTIPLE_ISSUES": "Jira: Importerte {{issuesLength}} nye problemer fra Jira til backlog",
-        "IMPORTED_SINGLE_ISSUE": "Jira: Importert problem \"{{issueText}}\" fra Jira til backlog",
         "INSUFFICIENT_SETTINGS": "Utilstrekkelige innstillinger gitt for Jira",
         "ISSUE_NO_UPDATE_REQUIRED": "Jira: \"{{issueText}}\" allerede oppdatert",
-        "ISSUE_UPDATE": "Jira: Oppdaterte data for \"{{issueText}}\"",
         "MANUAL_UPDATE_ISSUE_SUCCESS": "Jira: Oppdaterte data for \"{{issueText}}\"",
         "MISSING_ISSUE_DATA": "Jira: Oppgaver med manglende problemdata funnet. Laster om.",
         "NO_AUTO_IMPORT_JQL": "Jira: Ingen søkeord definert for automatisk import",
         "NO_VALID_TRANSITION": "Jira: Ingen gyldig overgang konfigurert",
-        "POLLING": "Jira: Avstemningsendringer for problemer",
         "TIMED_OUT": "Jira: Forespørsel ble tidsavbrutt",
         "TRANSITION": "Jira: Sett problemet \"{{issueKey}}\" til \"{{name}}\"",
         "TRANSITIONS_LOADED": "Jira: Overganger lastet. Bruk valgene nedenfor for å tildele dem",
         "TRANSITION_SUCCESS": "Jira: Sett problemet {{issueKey}} til <strong>{{chosenTransition}}</strong>",
-        "UNABLE_TO_REASSIGN": "Jira: Kunne ikke overføre billetten til deg selv, fordi du ikke spesifiserte et brukernavn. Vennligst besøk innstillingene."
+        "UNABLE_TO_REASSIGN": "Jira: Kunne ikke overføre billetten til deg selv, fordi du ikke spesifiserte et brukernavn. Vennligst besøk innstillingene.",
+        "IMPORTED_MULTIPLE_ISSUES": "Jira: Importerte {{issuesLength}} nye problemer fra Jira til backlog",
+        "IMPORTED_SINGLE_ISSUE": "Jira: Importert problem \"{{issueText}}\" fra Jira til backlog",
+        "ISSUE_UPDATE": "Jira: Oppdaterte data for \"{{issueText}}\"",
+        "POLLING": "Jira: Avstemningsendringer for problemer"
       },
       "STEPPER": {
         "CREDENTIALS": "Innloggingsdetaljer",
@@ -431,11 +370,20 @@
       }
     },
     "NOTE": {
-      "ADD_REMINDER": "Legg til påminnelse",
       "D_ADD": {
-        "DATETIME_LABEL": "Datetid for påminnelse (valgfritt)",
-        "NOTE_LABEL": "Skriv inn litt tekst for å lagre som notat ..."
+        "NOTE_LABEL": "Skriv inn litt tekst for å lagre som notat ...",
+        "DATETIME_LABEL": "Datetid for påminnelse (valgfritt)"
       },
+      "NOTES_CMP": {
+        "ADD_BTN": "Legg til en ny kommentar",
+        "DROP_TO_ADD": "Slipp her for å legge til et nytt notat"
+      },
+      "NOTE_CMP": {
+        "DISABLE_PARSE": "Deaktiver analysering av markdown",
+        "ENABLE_PARSE": "Aktiver markdown-analyse"
+      },
+      "EDIT_FULLSCREEN": "Rediger i fullskjerm",
+      "ADD_REMINDER": "Legg til påminnelse",
       "D_ADD_REMINDER": {
         "E_ENTER_TITLE": "Du må oppgi en tittel",
         "L_DATETIME": "Datotid for påminnelse",
@@ -445,16 +393,7 @@
         "SNOOZE": "Slumre",
         "TITLE": "Merk"
       },
-      "EDIT_FULLSCREEN": "Rediger i fullskjerm",
-      "EDIT_REMINDER": "Rediger påminnelse",
-      "NOTES_CMP": {
-        "ADD_BTN": "Legg til en ny kommentar",
-        "DROP_TO_ADD": "Slipp her for å legge til et nytt notat"
-      },
-      "NOTE_CMP": {
-        "DISABLE_PARSE": "Deaktiver analysering av markdown",
-        "ENABLE_PARSE": "Aktiver markdown-analyse"
-      },
+      "EDIT_SCHEDULED": "Rediger påminnelse",
       "REMOVE_REMINDER": "Fjern påminnelse",
       "S": {
         "ADDED_REMINDER": "Lagt til påminnelse for merknad",
@@ -621,11 +560,11 @@
       "ADD_TASK_BAR": {
         "ADD_EXISTING_TASK": "Legg til eksisterende oppgave \"{{taskTitle}}\"",
         "ADD_ISSUE_TASK": "Legg til utgave nr. {{issueNr}} fra {{issueType}}",
-        "ADD_TASK": "Legg til oppgave",
-        "ADD_TASK_TO_BACKLOG": "Legg til oppgave i backloggen",
         "CREATE_TASK": "Lag ny oppgave",
         "EXAMPLE": "Eksempel: \"Noen oppgavetittel + prosjektnavn #en tag #en annen tag 10m / 3h\"",
-        "START": "Trykk enter en gang til for å starte"
+        "START": "Trykk enter en gang til for å starte",
+        "ADD_TASK": "Legg til oppgave",
+        "ADD_TASK_TO_BACKLOG": "Legg til oppgave i backloggen"
       },
       "B": {
         "ADD_HALF_HOUR": "Tilsett 1/2 time",
@@ -638,7 +577,7 @@
         "CONVERT_TO_PARENT_TASK": "Konverter til foreldreoppgave",
         "DELETE": "Slett oppgave",
         "DROP_ATTACHMENT": "Slipp her for å legge ved \"{{title}}\"",
-        "EDIT_REMINDER": "Rediger påminnelse",
+        "EDIT_SCHEDULED": "Rediger påminnelse",
         "EDIT_TAGS": "Rediger koder",
         "MARK_DONE": "Marker som ferdig",
         "MARK_UNDONE": "Merk som ugjort",
@@ -652,7 +591,7 @@
         "REPEAT_EDIT": "Rediger konfigurasjon for gjentatt oppgave",
         "SCHEDULE": "Planlegg oppgaven",
         "SHOW_UPDATES": "Vis oppdateringer",
-        "TOGGLE_ADDITIONAL": "Vis / skjul tilleggsinformasjon",
+        "TOGGLE_DETAIL_PANEL": "Vis / skjul tilleggsinformasjon",
         "TOGGLE_ATTACHMENTS": "Vis / skjul vedlegg",
         "TOGGLE_DONE": "Merk som ferdig / angre",
         "TOGGLE_SUB_TASK_VISIBILITY": "Bytt synlighet av underoppgave",
@@ -660,12 +599,12 @@
         "TRACK_TIME_STOP": "Sett sporingstid på pause",
         "UPDATE_ISSUE_DATA": "Oppdater data om problemet"
       },
-      "D_REMINDER_ADD": {
-        "DATETIME_FOR": "Datotid for påminnelse",
-        "EDIT": "Rediger påminnelse",
+      "D_SCHEDULE_TASK": {
         "MOVE_TO_BACKLOG": "Flytt oppgaven til backlogg helt til planlagt",
         "SCHEDULE": "Legg til planlagt",
-        "UNSCHEDULE": "Fjern fra planlagt"
+        "UNSCHEDULE": "Fjern fra planlagt",
+        "DATETIME_FOR": "Datotid for påminnelse",
+        "EDIT": "Rediger påminnelse"
       },
       "D_REMINDER_VIEW": {
         "ADD_ALL_TO_TODAY": "Legg alt til i dag",
@@ -678,9 +617,9 @@
         "FOR_OTHER": "Oppgaven skal utføres. Vil du begynne å jobbe med det?",
         "FROM_PROJECT": "Fra prosjekt: \"{{title}}\"",
         "FROM_TAG": "Fra tag: \"{{title}}\"",
+        "RESCHEDULE_UNTIL_TOMORROW": "Til i morgen",
         "SNOOZE": "Slumre",
         "SNOOZE_ALL": "Utsett alle",
-        "RESCHEDULE_UNTIL_TOMORROW": "Til i morgen",
         "START": "Start",
         "SWITCH_CONTEXT_START": "Bytt kontekst og start"
       },
@@ -764,15 +703,15 @@
         "IDLE_FOR": "Du har vært inaktiv for:",
         "SKIP": "Hopp over",
         "TASK": "Oppgave",
-        "TASK_BREAK": "Oppgave + pause",
-        "TRACK_TO": "Spor til"
+        "TRACK_TO": "Spor til",
+        "TASK_BREAK": "Oppgave + pause"
       },
       "D_TRACKING_REMINDER": {
-        "UNTRACKED_TIME": "Usporet tid:",
-        "TRACK_TO": "Spor til:",
         "CREATE_AND_TRACK": "<em>Opprette</em> og spore til",
         "IDLE_FOR": "Du har vært inaktiv for:",
-        "TASK": "Oppgave"
+        "TASK": "Oppgave",
+        "TRACK_TO": "Spor til:",
+        "UNTRACKED_TIME": "Usporet tid:"
       }
     },
     "WORKLOG": {
@@ -827,6 +766,67 @@
         "NO_DATA": "Ingen oppgaver denne uken ennå.",
         "TITLE": "Tittel"
       }
+    },
+    "GOOGLE": {
+      "BANNER": {
+        "AUTH_FAIL": "GoogleApi: Kunne ikke autentisere, prøv å logge på igjen!"
+      },
+      "DIALOG": {
+        "CREATE_SYNC_FILE": "Google Disk: Ingen fil med navnet <strong>&quot;{{fileName}}&quot;</strong> ble funnet. <strong>Vil du opprette</strong> den som synkroniseringsfil på Google Disk?",
+        "USE_EXISTING_SYNC_FILE": "Google Drive: Bruk <strong>eksisterende</strong> fil <strong>&quot;{{fileName}}&quot;</strong> som synkroniseringsfil? Hvis ikke, kan du endre synkroniseringsfilnavnet."
+      },
+      "S": {
+        "MULTIPLE_SYNC_FILES_WITH_SAME_NAME": "Flere filer med navnet \"{{newFileName}}\" funnet. Slett alle unntatt en, eller velg et annet navn.",
+        "DOWNLOADING_UPDATE": "Google Drive: Det er en ekstern oppdatering! Laster ned ...",
+        "ERROR": "Google Disk - Feil: {{errTxt}}",
+        "ERROR_INITIAL_IMPORT": "Google Disk: Feil under forsøk på å importere data i utgangspunktet",
+        "LOCAL_UP_TO_DATE": "Google Drive: Lokale data er allerede oppdatert",
+        "NO_UPDATE_REQUIRED": "Google Drive: Ingen oppdatering nødvendig",
+        "REMOTE_UP_TO_DATE": "Google Drive: Eksterne data er allerede oppdatert",
+        "SUCCESS_IMPORT": "Google Drive: Lagret sikkerhetskopi",
+        "SYNCING": "Google Drive: Synkronisering"
+      },
+      "S_API": {
+        "ERR": "GoogleApi-feil: {{errStr}}",
+        "ERR_NO_FILE_ID": "GoogleApi: Ingen fil-ID er spesifisert",
+        "ERR_NO_FILE_NAME": "GoogleApi: Ingen filnavn er spesifisert",
+        "SUCCESS_LOGIN": "GoogleApi: Innlogging vellykket"
+      },
+      "D_CONFIRM_LOAD": {
+        "LAST_MOD": "siste modifikasjon:",
+        "LAST_SYNC": "siste synkronisering",
+        "LOCAL": "lokal",
+        "LOCAL_REMOTE": "lokal <=> ekstern",
+        "OVERWRITE_LOCAL": "Overskriv lokal",
+        "OVERWRITE_REMOTE": "Overskriv ekstern",
+        "REMOTE": "ekstern",
+        "TEXT": "<p>Oppdatering fra Google Drive Backup. Både lokale og eksterne data ser ut til å være endret. Vil du overskrive ikke-lagrede lokale endringer? <strong>All data vil gå tapt for alltid</strong>.</p>",
+        "TITLE": "Overskrive lokale data med GDrive Update?"
+      },
+      "D_CONFIRM_SAVE": {
+        "LAST_MOD": "siste modifikasjon:",
+        "LAST_SYNC": "siste synkronisering",
+        "LOCAL": "lokal",
+        "LOCAL_REMOTE": "lokal <=> ekstern",
+        "OVERWRITE_LOCAL": "Overskriv lokal",
+        "OVERWRITE_REMOTE": "Overskriv ekstern",
+        "REMOTE": "ekstern",
+        "TEXT": "<p>Det ser ut til å være noen endringer på Google Drive som du ikke har lokalt. Vil du overskrive dem uansett?</p>",
+        "TITLE": "Vil du overskrive ikke lagrede data på Google Disk?"
+      },
+      "SYNC_CFG": {
+        "AUTO_LOGIN": "Automatisk pålogging når du starter appen",
+        "AUTO_SYNC": "Automatisk synkronisering av data til ekstern",
+        "BACKUP_NOW": "Sikkerhetskopier nå",
+        "COMPRESS": "Komprimer data",
+        "ENABLE": "Aktiver synkronisering via Google Disk",
+        "LOAD_FROM": "Last fra GDrive",
+        "LOAD_ON_STARTUP": "Last inn eksterne data ved oppstart",
+        "NOTIFY": "Varsle når du synkroniserer",
+        "SYNC_FILE_NAME": "Synkroniser filnavn",
+        "SYNC_INTERVAL": "Synkroniseringsintervall",
+        "UPDATE_SYNC_FILE": "Oppdater synkroniseringsfil"
+      }
     }
   },
   "FILE_IMEX": {
@@ -836,12 +836,12 @@
   },
   "G": {
     "CANCEL": "Avbryt",
-    "CLICK_TO_EDIT": "klikk for å redigere",
     "CLOSE": "Lukk",
     "DELETE": "Slett",
     "DISMISS": "Avvis",
     "DO_IT": "Gjør det!",
     "EDIT": "Redigere",
+    "EXAMPLE_VAL": "klikk for å redigere",
     "EXTENSION_INFO": "Last <a target=\"_blank\" href=\"https://chrome.google.com/webstore/detail/super-productivity/ljkbjodfmekklcoibdnhahlaalhihmlb\">ned chrome-utvidelsen</a> for å tillate kommunikasjon med Jira Api og Idle Time Handling. Merk at dette ikke fungerer for mobil.",
     "LOGIN": "Logg Inn",
     "LOGOUT": "Logg ut",
@@ -870,17 +870,13 @@
       "IS_HIDE_EVALUATION_SHEET": "Skjul evalueringsark på daglig sammendrag",
       "TITLE": "Evaluering og beregninger"
     },
-    "GOOGLE_DRIVE_SYNC": {
-      "HELP": "Her kan du konfigurere appen din til automatisk å synkronisere til og fra en enkelt Google Drive-fil. Alle data lagres ukryptert, så pass på at du ikke ved en feiltakelse deler denne filen med noen.",
-      "TITLE": "Synkroniser via Google Disk"
-    },
     "IDLE": {
       "HELP": "<div><p>Når håndtering av inaktiv tid er aktivert, åpnes en dialog etter en spesifisert tid for å sjekke om og på hvilken oppgave du vil spore tiden din, når du har vært inaktiv.</p></div>",
       "IS_ENABLE_IDLE_TIME_TRACKING": "Aktiver håndtering av inaktiv tid",
       "IS_ONLY_OPEN_IDLE_WHEN_CURRENT_TASK": "Bare utløs tomgangsdialog når en aktuell oppgave er valgt",
-      "IS_UN_TRACKED_IDLE_RESETS_BREAK_TIMER": "Usporet inaktiv tid tilbakestiller 'ta en pause'-timer",
       "MIN_IDLE_TIME": "Utløser tomgang etter X",
-      "TITLE": "Tomgangshåndtering"
+      "TITLE": "Tomgangshåndtering",
+      "IS_UN_TRACKED_IDLE_RESETS_BREAK_TIMER": "Usporet inaktiv tid tilbakestiller 'ta en pause'-timer"
     },
     "IMEX": {
       "HELP": "<p>Her kan du eksportere alle dataene dine som en <strong>JSON</strong> for sikkerhetskopiering, men også for å bruke dem i en annen kontekst (f.eks. Vil du kanskje eksportere prosjektene dine i nettleseren og importere dem til desktopversjonen).</p><p> Importen forventer at gyldig JSON kopieres til tekstområdet. <strong>MERKNAD: Når du trykker på importknappen, overskrives alle dine nåværende innstillinger og data!</strong></p>",
@@ -910,6 +906,7 @@
       "SELECT_PREVIOUS_TASK": "Velg forrige oppgave",
       "SYSTEM_SHORTCUTS": "Globale snarveier (hele systemet)",
       "TASK_ADD_SUB_TASK": "Legg til underoppgave",
+      "TASK_ADD_ATTACHMENT": "Legg ved fil eller lenke",
       "TASK_DELETE": "Slett oppgave",
       "TASK_EDIT_TITLE": "Rediger tittel",
       "TASK_MOVE_TO_PROJECT": "Åpne flytt oppgave til prosjektmeny",
@@ -917,7 +914,7 @@
       "TASK_SCHEDULE": "Planlegg oppgave",
       "TASK_SHORTCUTS": "Oppgaver",
       "TASK_SHORTCUTS_INFO": "Følgende snarveier gjelder for den valgte oppgaven (valgt via fane eller mus).",
-      "TASK_TOGGLE_ADDITIONAL_INFO_OPEN": "Vis / skjul tilleggsinformasjon",
+      "TASK_TOGGLE_DETAIL_PANEL_OPEN": "Vis / skjul tilleggsinformasjon",
       "TASK_TOGGLE_DONE": "Slå på Ferdig",
       "TITLE": "Tastatursnarveier",
       "TOGGLE_BACKLOG": "Vis / skjul oppgavestand",
@@ -927,41 +924,20 @@
       "ZOOM_IN": "Zoom inn (bare skrivebordet)",
       "ZOOM_OUT": "Zoom ut (bare skrivebordet)"
     },
-    "LANG": {
-      "AR": "Arabisk",
-      "DE": "Tysk",
-      "EN": "Engelsk",
-      "ES": "Spansk",
-      "FA": "Farsi",
-      "FR": "Fransk",
-      "IT": "Italiensk",
-      "JA": "Japansk",
-      "KO": "Koreansk",
-      "LABEL": "Velg et språk",
-      "NB": "Norsk Bokmål",
-      "NL": "Nederlandsk",
-      "PT": "Portugisisk",
-      "PL": "Pusse",
-      "RU": "Russisk",
-      "TITLE": "Språk",
-      "TR": "Tyrkisk",
-      "ZH": "Kinesisk (forenklet)",
-      "ZH_TW": "Kinesisk (traditionelt)"
-    },
     "MISC": {
       "DEFAULT_PROJECT": "Standard prosjekt som skal brukes til oppgaver hvis ingen er spesifisert",
+      "FIRST_DAY_OF_WEEK": "Første ukedag",
       "HELP": "<p><strong>Ser du ikke skrivebordsvarsler?</strong> For Windows vil du kanskje sjekke System&gt; Varsler og handlinger og sjekke om de nødvendige varslene er aktivert.</p>",
       "IS_AUTO_ADD_WORKED_ON_TO_TODAY": "Legg til dagens tag automatisk for å jobbe med oppgaver",
       "IS_AUTO_MARK_PARENT_AS_DONE": "Merk foreldreoppgaven som ferdig når alle underoppgaver er utført",
-      "IS_AUTO_START_NEXT_TASK": "Begynn å spore neste oppgave når du merker nåværende som ferdig",
       "IS_CONFIRM_BEFORE_EXIT": "Bekreft før du avslutter appen",
       "IS_DARK_MODE": "Mørk modus",
-      "IS_DISABLE_INITIAL_DIALOG": "Deaktiver innledende infodialog (du kan gå glipp av viktige oppdateringer!)",
       "IS_HIDE_NAV": "Skjul navigasjonen til hovedoverskriften er svevet (kun på skrivebordet)",
-      "IS_NOTIFY_WHEN_TIME_ESTIMATE_EXCEEDED": "Gi beskjed når tidsestimatet ble overskredet",
       "IS_TURN_OFF_MARKDOWN": "Slå av Markdown-parsering for notater",
       "TITLE": "Diverse innstillinger",
-      "FIRST_DAY_OF_WEEK": "Første ukedag"
+      "IS_AUTO_START_NEXT_TASK": "Begynn å spore neste oppgave når du merker nåværende som ferdig",
+      "IS_NOTIFY_WHEN_TIME_ESTIMATE_EXCEEDED": "Gi beskjed når tidsestimatet ble overskredet",
+      "IS_DISABLE_INITIAL_DIALOG": "Deaktiver innledende infodialog (du kan gå glipp av viktige oppdateringer!)"
     },
     "POMODORO": {
       "BREAK_DURATION": "Varighet av korte pauser",
@@ -980,9 +956,9 @@
     "SOUND": {
       "DONE_SOUND": "Oppgavelyd",
       "IS_INCREASE_DONE_PITCH": "Øk tonehøyde for hver oppgave",
-      "IS_PLAY_DONE_SOUND": "Spill lyd når oppgaven er merket som ferdig",
       "TITLE": "Lyd",
-      "VOLUME": "Volum"
+      "VOLUME": "Volum",
+      "IS_PLAY_DONE_SOUND": "Spill lyd når oppgaven er merket som ferdig"
     },
     "TAKE_A_BREAK": {
       "HELP": "<div><p>Lar deg konfigurere en påminnelse som kommer igjen når du har jobbet i en spesifisert tid uten å ta en pause.</p><p> Du kan endre meldingen som vises. $ {duration} blir erstattet med tiden brukt uten pause.</p></div>",
@@ -996,10 +972,14 @@
     },
     "TRACKING_REMINDER": {
       "HELP": "Konfigurer et banner for å vises i tilfelle du glemte å starte tidssporing.",
-      "TITLE": "Påminnelse om tidssporing",
       "L_IS_ENABLED": "Aktivert",
       "L_IS_SHOW_ON_MOBILE": "Vis på mobilappen",
-      "L_MIN_TIME": "Tid til å vente før du viser Banner"
+      "L_MIN_TIME": "Tid til å vente før du viser Banner",
+      "TITLE": "Påminnelse om tidssporing"
+    },
+    "GOOGLE_DRIVE_SYNC": {
+      "HELP": "Her kan du konfigurere appen din til automatisk å synkronisere til og fra en enkelt Google Drive-fil. Alle data lagres ukryptert, så pass på at du ikke ved en feiltakelse deler denne filen med noen.",
+      "TITLE": "Synkroniser via Google Disk"
     }
   },
   "GLOBAL_SNACK": {
@@ -1016,10 +996,10 @@
     "DBX_GEN_TOKEN": "Dropbox: Generer token ...",
     "DBX_META": "Dropbox: Få metadata om fil ...",
     "DBX_UPLOAD": "Dropbox: Last opp fil ...",
-    "GDRIVE_DOWNLOAD": "Google Drive: Last ned fil ...",
-    "GDRIVE_UPLOAD": "Google Drive: Last opp fil ...",
     "GITHUB_LOAD_ISSUE": "GitHub: Last problemdata ...",
-    "JIRA_LOAD_ISSUE": "Jira: Last inn data ..."
+    "JIRA_LOAD_ISSUE": "Jira: Last inn data ...",
+    "GDRIVE_DOWNLOAD": "Google Drive: Last ned fil ...",
+    "GDRIVE_UPLOAD": "Google Drive: Last opp fil ..."
   },
   "MH": {
     "ADD_NEW_TASK": "Legg til ny oppgave",
@@ -1027,14 +1007,12 @@
     "CREATE_TAG": "Opprett tag",
     "DELETE_TAG": "Slett tag",
     "GO_TO_TASK_LIST": "Gå til oppgavelisten",
-    "MANAGE_PROJECTS": "Administrer prosjekter",
     "METRICS": "Beregninger",
     "NOTES": "Merknader",
     "PROCRASTINATE": "Utsette",
     "PROJECTS": "Prosjekter",
     "PROJECT_MENU": "Prosjektmeny",
     "PROJECT_SETTINGS": "Prosjektinnstillinger",
-    "SCHEDULED": "Planlagt",
     "SETTINGS": "Innstillinger",
     "TAGS": "Merker",
     "TASKS": "Oppgaver",
@@ -1042,7 +1020,9 @@
     "TOGGLE_SHOW_BOOKMARKS": "Vis / skjul bokmerker",
     "TOGGLE_SHOW_NOTES": "Vis / skjul prosjektnotater",
     "TOGGLE_TRACK_TIME": "Start / stopp sporingstid",
-    "WORKLOG": "Arbeidslogg"
+    "WORKLOG": "Arbeidslogg",
+    "MANAGE_PROJECTS": "Administrer prosjekter",
+    "SCHEDULED": "Planlagt"
   },
   "PDS": {
     "BACK": "Vent, jeg glemte noe!",
@@ -1054,10 +1034,8 @@
       "MSG": "Arbeidet ditt er gjort. På tide å gå hjem!",
       "OK": "Jepp! Skru av!"
     },
-    "EVALUATION": "Evaluering",
     "EXPORT_TASK_LIST": "Eksporter oppgaveliste",
     "NO_TASKS": "Det er ingen oppgaver for denne dagen",
-    "PLAN": "Plan",
     "ROUND_15M": "Avrund alle oppgavene til 15 minutter",
     "ROUND_30M": "Avrund alle oppgavene til 30 minutter",
     "ROUND_5M": "Avrund alle oppgavene til 5 minutter",
@@ -1071,41 +1049,16 @@
     "START_END": "Start - Slutt",
     "SUMMARY_FOR": "Daglig sammendrag for {{dayStr}}",
     "TASKS_COMPLETED": "Oppgaver fullført",
-    "TASK_LIST": "Oppgaveliste",
     "TIME_SPENT_AND_ESTIMATE_LABEL": "Tid brukt / estimert",
     "TIME_SPENT_ESTIMATE_TITLE": "Tidsbruk: Total tid brukt i dag. Arkiverte oppgaver er ikke inkludert. - Beregnet tid: Anslått tid for oppgaver som jobbes med i dag minus tiden som allerede er brukt sammen med dem andre dager.",
-    "TODAY": "I dag",
-    "WEEK": "Uke"
+    "WEEK": "Uke",
+    "EVALUATION": "Evaluering",
+    "PLAN": "Plan",
+    "TASK_LIST": "Oppgaveliste",
+    "TODAY": "I dag"
   },
   "PM": {
     "TITLE": "Prosjektstatistikk"
-  },
-  "PP": {
-    "ARCHIVED_PROJECTS": "Arkiverte prosjekter",
-    "ARCHIVE_PROJECT": "Arkivprosjekt",
-    "CREATE_NEW": "Lag ny",
-    "DELETE_PROJECT": "Slett prosjekt",
-    "D_CONFIRM_ARCHIVE": {
-      "MSG": "Er du sikker på at du vil arkivere dette prosjektet? Arkiverte prosjekter vises ikke lenger i menyen, og du kan ikke få tilgang til dataene deres uten å gjenopprette dem. Det anbefales at du sikkerhetskopierer dataene dine før du gjør dette.",
-      "OK": "Arkiv"
-    },
-    "D_CONFIRM_DELETE": {
-      "MSG": "Er du sikker på at du vil slette dette prosjektet? Det anbefales å sikkerhetskopiere dataene dine før du gjør dette.",
-      "OK": "Slett"
-    },
-    "D_CONFIRM_UNARCHIVE": {
-      "MSG": "Er du sikker på at du vil fjerne arkivet for dette prosjektet?",
-      "OK": "Unarkiv"
-    },
-    "EDIT_PROJECT": "Rediger prosjekt",
-    "EXPORT_PROJECT": "Eksporter prosjekt",
-    "GITHUB_CONFIGURED": "GitHub-integrasjon konfigurert",
-    "GITLAB_CONFIGURED": "GitLab-integrasjon konfigurert",
-    "IMPORT_FROM_FILE": "Importer fra fil",
-    "JIRA_CONFIGURED": "Jira Integration konfigurert",
-    "S_INVALID_JSON": "Ugyldig json for prosjektfilen",
-    "TITLE": "Prosjektoversikt",
-    "UN_ARCHIVE_PROJECT": "Unarchive Project"
   },
   "PS": {
     "GLOBAL_SETTINGS": "Globale innstillinger",
@@ -1116,14 +1069,6 @@
     "SYNC_EXPORT": "Synkroniser og eksporter",
     "TAG_SETTINGS": "Merk spesifikke innstillinger",
     "TOGGLE_DARK_MODE": "Bytt mørk modus"
-  },
-  "S": {
-    "SYNC": {
-      "ERROR_FALLBACK_TO_BACKUP": "Noe gikk galt under dataimporten. Faller tilbake til lokal sikkerhetskopi.",
-      "ERROR_INVALID_DATA": "Feil under synkronisering. Ugyldig data",
-      "IMPORTING": "Importerer data",
-      "SUCCESS_IMPORT": "Data importert"
-    }
   },
   "SCHEDULE": {
     "NO_SCHEDULED": "Det er for øyeblikket ingen planlagte oppgaver. Du kan planlegge en oppgave ved å velge \"Planlegg oppgave\" i oppgavens kontekstmeny. For å åpne den, klikk på de tre små prikkene til høyre for en oppgave.",
@@ -1171,5 +1116,40 @@
     "TIME_ESTIMATED": "Anslått tid:",
     "WITHOUT_BREAK": "Uten pause:",
     "WORKING_TODAY": "Jobber i dag:"
+  },
+  "PP": {
+    "ARCHIVED_PROJECTS": "Arkiverte prosjekter",
+    "ARCHIVE_PROJECT": "Arkivprosjekt",
+    "DELETE_PROJECT": "Slett prosjekt",
+    "D_CONFIRM_ARCHIVE": {
+      "MSG": "Er du sikker på at du vil arkivere dette prosjektet? Arkiverte prosjekter vises ikke lenger i menyen, og du kan ikke få tilgang til dataene deres uten å gjenopprette dem. Det anbefales at du sikkerhetskopierer dataene dine før du gjør dette.",
+      "OK": "Arkiv"
+    },
+    "D_CONFIRM_DELETE": {
+      "MSG": "Er du sikker på at du vil slette dette prosjektet? Det anbefales å sikkerhetskopiere dataene dine før du gjør dette.",
+      "OK": "Slett"
+    },
+    "D_CONFIRM_UNARCHIVE": {
+      "MSG": "Er du sikker på at du vil fjerne arkivet for dette prosjektet?",
+      "OK": "Unarkiv"
+    },
+    "EDIT_PROJECT": "Rediger prosjekt",
+    "EXPORT_PROJECT": "Eksporter prosjekt",
+    "GITHUB_CONFIGURED": "GitHub-integrasjon konfigurert",
+    "GITLAB_CONFIGURED": "GitLab-integrasjon konfigurert",
+    "IMPORT_FROM_FILE": "Importer fra fil",
+    "JIRA_CONFIGURED": "Jira Integration konfigurert",
+    "S_INVALID_JSON": "Ugyldig json for prosjektfilen",
+    "TITLE": "Prosjektoversikt",
+    "UN_ARCHIVE_PROJECT": "Unarchive Project",
+    "CREATE_NEW": "Lag ny"
+  },
+  "S": {
+    "SYNC": {
+      "ERROR_FALLBACK_TO_BACKUP": "Noe gikk galt under dataimporten. Faller tilbake til lokal sikkerhetskopi.",
+      "ERROR_INVALID_DATA": "Feil under synkronisering. Ugyldig data",
+      "IMPORTING": "Importerer data",
+      "SUCCESS_IMPORT": "Data importert"
+    }
   }
 }

@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import {
   addTimeSpent,
-  moveToArchive,
+  moveToArchive_,
   restoreTask,
   updateTask,
   updateTaskTags,
@@ -20,7 +20,7 @@ import { unique } from '../../../util/unique';
 import { TaskService } from '../task.service';
 import { EMPTY, Observable, of } from 'rxjs';
 import { createEmptyEntity } from '../../../util/create-empty-entity';
-import { moveProjectTaskToTodayList } from '../../project/store/project.actions';
+import { moveProjectTaskToRegularList } from '../../project/store/project.actions';
 import { SnackService } from '../../../core/snack/snack.service';
 import { T } from '../../../t.const';
 
@@ -32,7 +32,7 @@ export class TaskRelatedModelEffects {
   moveToArchive$: any = createEffect(
     () =>
       this._actions$.pipe(
-        ofType(moveToArchive),
+        ofType(moveToArchive_),
         tap(({ tasks }) => this._moveToArchive(tasks)),
       ),
     { dispatch: false },
@@ -75,7 +75,6 @@ export class TaskRelatedModelEffects {
           updateTaskTags({
             task,
             newTagIds: unique([...task.tagIds, TODAY_TAG.id]),
-            oldTagIds: task.tagIds,
           }),
         ),
       ),
@@ -93,7 +92,6 @@ export class TaskRelatedModelEffects {
           updateTaskTags({
             task,
             newTagIds: unique([...task.tagIds, TODAY_TAG.id]),
-            oldTagIds: task.tagIds,
           }),
         ),
       ),
@@ -105,7 +103,7 @@ export class TaskRelatedModelEffects {
 
   moveTaskToUnDone$: any = createEffect(() =>
     this._actions$.pipe(
-      ofType(moveTaskInTodayList, moveProjectTaskToTodayList),
+      ofType(moveTaskInTodayList, moveProjectTaskToRegularList),
       filter(
         ({ src, target }) => (src === 'DONE' || src === 'BACKLOG') && target === 'UNDONE',
       ),
@@ -124,7 +122,7 @@ export class TaskRelatedModelEffects {
 
   moveTaskToDone$: any = createEffect(() =>
     this._actions$.pipe(
-      ofType(moveTaskInTodayList, moveProjectTaskToTodayList),
+      ofType(moveTaskInTodayList, moveProjectTaskToRegularList),
       filter(
         ({ src, target }) => (src === 'UNDONE' || src === 'BACKLOG') && target === 'DONE',
       ),
@@ -145,7 +143,7 @@ export class TaskRelatedModelEffects {
     this._actions$.pipe(
       ofType(updateTaskTags),
       filter(({ isSkipExcludeCheck }) => !isSkipExcludeCheck),
-      switchMap(({ task, newTagIds, oldTagIds }) => {
+      switchMap(({ task, newTagIds }) => {
         if (task.parentId) {
           return this._taskService.getByIdOnce$(task.parentId).pipe(
             switchMap((parentTask) => {
@@ -163,7 +161,6 @@ export class TaskRelatedModelEffects {
                   return of(
                     updateTaskTags({
                       task: parentTask,
-                      oldTagIds: parentTask.tagIds,
                       newTagIds: freeTags,
                       isSkipExcludeCheck: true,
                     }),
@@ -179,8 +176,10 @@ export class TaskRelatedModelEffects {
                   // reverse previous updateTaskTags action since not possible
                   return of(
                     updateTaskTags({
-                      task: task,
-                      oldTagIds: newTagIds,
+                      task: {
+                        ...task,
+                        tagIds: newTagIds,
+                      },
                       newTagIds: freeTagsForSub,
                       isSkipExcludeCheck: true,
                     }),
@@ -200,7 +199,6 @@ export class TaskRelatedModelEffects {
                 .map((subTask) => {
                   return updateTaskTags({
                     task: subTask,
-                    oldTagIds: subTask.tagIds,
                     newTagIds: subTask.tagIds.filter((id) => !newTagIds.includes(id)),
                     isSkipExcludeCheck: true,
                   });
@@ -247,6 +245,7 @@ export class TaskRelatedModelEffects {
   }
 
   private async _moveToArchive(tasks: TaskWithSubTasks[]): Promise<unknown> {
+    const now = Date.now();
     const flatTasks = flattenTasks(tasks);
     if (!flatTasks.length) {
       return;
@@ -261,6 +260,12 @@ export class TaskRelatedModelEffects {
         reminderId: null,
         isDone: true,
         plannedAt: null,
+        doneOn:
+          task.isDone && task.doneOn
+            ? task.doneOn
+            : task.parentId
+              ? flatTasks.find((t) => t.id === task.parentId)?.doneOn || now
+              : now,
       })),
       currentArchive,
     );

@@ -4,7 +4,8 @@ import {
   selectAllTaskRepeatCfgs,
   selectTaskRepeatCfgById,
   selectTaskRepeatCfgByIdAllowUndefined,
-  selectTaskRepeatCfgsDueOnDay,
+  selectTaskRepeatCfgsDueOnDayIncludingOverdue,
+  selectTaskRepeatCfgsDueOnDayOnly,
   selectTaskRepeatCfgsWithStartTime,
 } from './store/task-repeat-cfg.reducer';
 import {
@@ -28,7 +29,7 @@ import { T } from '../../t.const';
 import { take } from 'rxjs/operators';
 import { TaskService } from '../tasks/task.service';
 import { TODAY_TAG } from '../tag/tag.const';
-import { Task, TaskPlanned } from '../tasks/task.model';
+import { Task } from '../tasks/task.model';
 import { addTask, scheduleTask } from '../tasks/store/task.actions';
 import { WorkContextService } from '../work-context/work-context.service';
 import { WorkContextType } from '../work-context/work-context.model';
@@ -36,7 +37,7 @@ import { isValidSplitTime } from '../../util/is-valid-split-time';
 import { getDateTimeFromClockString } from '../../util/get-date-time-from-clock-string';
 import { isSameDay } from '../../util/is-same-day';
 import { remindOptionToMilliseconds } from '../tasks/util/remind-option-to-milliseconds';
-import { sortRepeatableTaskCfgs } from './sort-repeatable-task-cfg';
+import { getNewestPossibleDueDate } from './store/get-newest-possible-due-date.util';
 
 @Injectable({
   providedIn: 'root',
@@ -55,19 +56,61 @@ export class TaskRepeatCfgService {
     private _matDialog: MatDialog,
     private _taskService: TaskService,
     private _workContextService: WorkContextService,
-  ) {}
+  ) {
+    // FOR TESTING CREATION
+    // setTimeout(() => {
+    //   this._store$.dispatch(
+    //     upsertTaskRepeatCfg({
+    //       taskRepeatCfg: {
+    //         ...DEFAULT_TASK_REPEAT_CFG,
+    //         id: 'A1',
+    //         defaultEstimate: 1000 * 60 * 60,
+    //         // eslint-disable-next-line no-mixed-operators
+    //         startDate: getWorklogStr(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    //         // eslint-disable-next-line no-mixed-operators
+    //         lastTaskCreation: Date.now() - 5 * 24 * 60 * 60 * 1000,
+    //         // startTime: '10:00',
+    //         title: 'My repeating task with no schedule',
+    //       },
+    //     }),
+    //   );
+    //   this._store$.dispatch(
+    //     upsertTaskRepeatCfg({
+    //       taskRepeatCfg: {
+    //         ...DEFAULT_TASK_REPEAT_CFG,
+    //         id: 'A2',
+    //         defaultEstimate: 1000 * 60 * 60,
+    //         // eslint-disable-next-line no-mixed-operators
+    //         startDate: getWorklogStr(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    //         // eslint-disable-next-line no-mixed-operators
+    //         lastTaskCreation: Date.now() - 5 * 24 * 60 * 60 * 1000,
+    //         startTime: '20:00',
+    //         remindAt: TaskReminderOptionId.AtStart,
+    //         title: 'My repeating task with schedule at 20:00',
+    //       },
+    //     }),
+    //   );
+    // }, 500);
+  }
 
-  getRepeatTableTasksDueForDay$(dayDate: number): Observable<TaskRepeatCfg[]> {
+  getRepeatTableTasksDueForDayOnly$(dayDate: number): Observable<TaskRepeatCfg[]> {
     // ===> taskRepeatCfgs scheduled for today and not yet created already
-    return this._store$.pipe(select(selectTaskRepeatCfgsDueOnDay, { dayDate }));
+    return this._store$.select(selectTaskRepeatCfgsDueOnDayOnly, { dayDate });
+  }
+
+  getRepeatTableTasksDueForDayIncludingOverdue$(
+    dayDate: number,
+  ): Observable<TaskRepeatCfg[]> {
+    // ===> taskRepeatCfgs scheduled for today and not yet created already
+    return this._store$.select(selectTaskRepeatCfgsDueOnDayIncludingOverdue, { dayDate });
   }
 
   getTaskRepeatCfgById$(id: string): Observable<TaskRepeatCfg> {
-    return this._store$.pipe(select(selectTaskRepeatCfgById, { id }));
+    return this._store$.select(selectTaskRepeatCfgById, { id });
   }
 
   getTaskRepeatCfgByIdAllowUndefined$(id: string): Observable<TaskRepeatCfg | undefined> {
-    return this._store$.pipe(select(selectTaskRepeatCfgByIdAllowUndefined, { id }));
+    return this._store$.select(selectTaskRepeatCfgByIdAllowUndefined, { id });
   }
 
   addTaskRepeatCfgToTask(
@@ -119,11 +162,9 @@ export class TaskRepeatCfgService {
   async createRepeatableTask(
     taskRepeatCfg: TaskRepeatCfg,
     targetDayDate: number,
-    currentTaskId: string | null,
   ): Promise<void> {
     const actionsForRepeatCfg = await this.getActionsForTaskRepeatCfg(
       taskRepeatCfg,
-      currentTaskId,
       targetDayDate,
     );
     actionsForRepeatCfg.forEach((act) => {
@@ -149,30 +190,9 @@ export class TaskRepeatCfgService {
   }
 
   // NOTE: there is a duplicate of this in plan-tasks-tomorrow.component
-  async addAllPlannedToDayAndCreateRepeatable(
-    plannedTasks: TaskPlanned[],
-    repeatableScheduledForTomorrow: TaskRepeatCfg[],
-    currentTaskId: string | null,
-    targetDay: number,
-  ): Promise<void> {
-    if (plannedTasks.length) {
-      await this._taskService.movePlannedTasksToToday(plannedTasks);
-    }
-    if (repeatableScheduledForTomorrow.length) {
-      console.log(repeatableScheduledForTomorrow.sort(sortRepeatableTaskCfgs));
-
-      const promises = repeatableScheduledForTomorrow
-        .sort(sortRepeatableTaskCfgs)
-        .map((repeatCfg) => {
-          return this.createRepeatableTask(repeatCfg, targetDay, currentTaskId);
-        });
-      await Promise.all(promises);
-    }
-  }
 
   async getActionsForTaskRepeatCfg(
     taskRepeatCfg: TaskRepeatCfg,
-    currentTaskId: string | null,
     targetDayDate: number = Date.now(),
   ): // NOTE: updateTaskRepeatCfg missing as there is no way to declare it as action type
   Promise<
@@ -200,6 +220,13 @@ export class TaskRepeatCfgService {
     if (!isCreateNew) {
       return [];
     }
+    const targetCreated = getNewestPossibleDueDate(
+      taskRepeatCfg,
+      new Date(targetDayDate),
+    );
+    if (!targetCreated) {
+      throw new Error('Unable to getNewestPossibleDueDate()');
+    }
 
     const { task, isAddToBottom } = this._getTaskRepeatTemplate(taskRepeatCfg);
 
@@ -211,9 +238,9 @@ export class TaskRepeatCfgService {
       addTask({
         task: {
           ...task,
-          // NOTE otherwise isCreateNew check above would not work as intended and
+          // NOTE if moving this to top isCreateNew check above would not work as intended
           // we use created also for the repeat day label for past tasks
-          created: targetDayDate,
+          created: targetCreated.getTime(),
         },
         workContextType: this._workContextService
           .activeWorkContextType as WorkContextType,
@@ -244,6 +271,7 @@ export class TaskRepeatCfgService {
           plannedAt: dateTime,
           remindAt: remindOptionToMilliseconds(dateTime, taskRepeatCfg.remindAt),
           isMoveToBacklog: false,
+          isSkipAutoRemoveFromToday: true,
         }),
       );
     }

@@ -20,16 +20,17 @@ import { DialogTrackingReminderComponent } from './dialog-tracking-reminder/dial
 import { Task } from '../tasks/task.model';
 import { T } from '../../t.const';
 import { TranslateService } from '@ngx-translate/core';
-import { TrackingReminderConfig } from '../config/global-config.model';
+import { TimeTrackingConfig } from '../config/global-config.model';
 import { IS_TOUCH_ONLY } from '../../util/is-touch-only';
 import { DateService } from 'src/app/core/date/date.service';
+import { TakeABreakService } from '../take-a-break/take-a-break.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class TrackingReminderService {
-  _cfg$: Observable<TrackingReminderConfig> = this._globalConfigService.cfg$.pipe(
-    map((cfg) => cfg?.trackingReminder),
+  _cfg$: Observable<TimeTrackingConfig> = this._globalConfigService.cfg$.pipe(
+    map((cfg) => cfg?.timeTracking),
   );
 
   _counter$: Observable<number> = realTimer$(1000);
@@ -47,7 +48,8 @@ export class TrackingReminderService {
 
   remindCounter$: Observable<number> = this._cfg$.pipe(
     switchMap((cfg) =>
-      !cfg.isEnabled || (!cfg.isShowOnMobile && IS_TOUCH_ONLY)
+      !cfg?.isTrackingReminderEnabled ||
+      (!cfg.isTrackingReminderShowOnMobile && IS_TOUCH_ONLY)
         ? EMPTY
         : combineLatest([
             this._taskService.currentTaskId$,
@@ -56,7 +58,7 @@ export class TrackingReminderService {
             map(([currentTaskId, isIdle]) => !currentTaskId && !isIdle),
             distinctUntilChanged(),
             switchMap((isEnabled) => (isEnabled ? this._resetableCounter$ : of(0))),
-            filter((time) => time > cfg.minTime),
+            filter((time) => time > cfg.trackingReminderMinTime),
           ),
     ),
     shareReplay(),
@@ -70,6 +72,7 @@ export class TrackingReminderService {
     private _matDialog: MatDialog,
     private _translateService: TranslateService,
     private _dateService: DateService,
+    private _takeABreakService: TakeABreakService,
   ) {}
 
   init(): void {
@@ -129,6 +132,7 @@ export class TrackingReminderService {
           const timeSpent = remindCounter;
 
           if (task) {
+            this._takeABreakService.otherNoBreakTIme$.next(timeSpent);
             if (typeof task === 'string') {
               const currId = this._taskService.add(task, false, {
                 timeSpent,
@@ -138,7 +142,7 @@ export class TrackingReminderService {
               });
               this._taskService.setCurrentId(currId);
             } else {
-              this._taskService.addTimeSpent(task, timeSpent);
+              this._taskService.addTimeSpent(task, timeSpent, undefined, true);
               this._taskService.setCurrentId(task.id);
             }
           }

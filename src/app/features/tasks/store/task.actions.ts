@@ -1,6 +1,6 @@
 import { createAction, props } from '@ngrx/store';
 import { Update } from '@ngrx/entity';
-import { Task, TaskAdditionalInfoTargetPanel, TaskWithSubTasks } from '../task.model';
+import { Task, TaskDetailTargetPanel, TaskWithSubTasks } from '../task.model';
 import { IssueDataReduced } from '../../issue/issue.model';
 import { RoundTimeOption } from '../../project/project.model';
 import { WorkContextType } from '../../work-context/work-context.model';
@@ -45,7 +45,7 @@ enum TaskActionTypes {
   'MoveToOtherProject' = '[Task] Move tasks to other project',
   'ToggleStart' = '[Task] Toggle start',
   'RoundTimeSpentForDay' = '[Task] RoundTimeSpentForDay',
-  'AddNewTagsFromShortSyntax' = '[Task] Add new tags form short syntax',
+  'AddNewTagsFromShortSyntax' = '[Task] Add new tags from short syntax',
 }
 
 export const setCurrentTask = createAction(
@@ -59,7 +59,8 @@ export const setSelectedTask = createAction(
   TaskActionTypes.SetSelectedTask,
   props<{
     id: string | null;
-    taskAdditionalInfoTargetPanel?: TaskAdditionalInfoTargetPanel;
+    taskDetailTargetPanel?: TaskDetailTargetPanel;
+    isSkipToggle?: boolean;
   }>(),
 );
 
@@ -96,7 +97,6 @@ export const updateTaskTags = createAction(
   props<{
     task: Task;
     newTagIds: string[];
-    oldTagIds: string[];
     isSkipExcludeCheck?: boolean;
   }>(),
 );
@@ -166,7 +166,12 @@ export const moveSubTaskToBottom = createAction(
 export const addTimeSpent = createAction(
   TaskActionTypes.AddTimeSpent,
 
-  props<{ task: Task; date: string; duration: number }>(),
+  props<{
+    task: Task;
+    date: string;
+    duration: number;
+    isFromTrackingReminder: boolean;
+  }>(),
 );
 
 export const removeTimeSpent = createAction(
@@ -184,6 +189,7 @@ export const scheduleTask = createAction(
     plannedAt: number;
     remindAt?: number;
     isMoveToBacklog: boolean;
+    isSkipAutoRemoveFromToday?: boolean;
   }>(),
 );
 
@@ -222,7 +228,8 @@ export const convertToMainTask = createAction(
   props<{ task: Task; parentTagIds: string[] }>(),
 );
 
-export const moveToArchive = createAction(
+// the _ indicates that it should not be used directly, but always over the service instead
+export const moveToArchive_ = createAction(
   TaskActionTypes.MoveToArchive,
 
   props<{ tasks: TaskWithSubTasks[] }>(),

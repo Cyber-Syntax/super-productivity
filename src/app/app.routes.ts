@@ -1,11 +1,10 @@
 import { Routes } from '@angular/router';
 import { ProjectTaskPageComponent } from './pages/project-task-page/project-task-page.component';
 import { ConfigPageComponent } from './pages/config-page/config-page.component';
-import { ProjectOverviewPageComponent } from './pages/project-overview-page/project-overview-page.component';
 import { DailySummaryComponent } from './pages/daily-summary/daily-summary.component';
 import { WorklogComponent } from './features/worklog/worklog.component';
 import { MetricPageComponent } from './pages/metric-page/metric-page.component';
-import { SchedulePageComponent } from './pages/schedule-page/schedule-page.component';
+import { ScheduledListPageComponent } from './pages/scheduled-list-page/scheduled-list-page.component';
 import { ProjectSettingsPageComponent } from './pages/project-settings-page/project-settings-page.component';
 import { TagTaskPageComponent } from './pages/tag-task-page/tag-task-page.component';
 import {
@@ -16,8 +15,9 @@ import {
 } from './app.guard';
 import { TagSettingsPageComponent } from './pages/tag-settings-page/tag-settings-page.component';
 import { TODAY_TAG } from './features/tag/tag.const';
-import { TimelinePageComponent } from './pages/timeline-page/timeline-page.component';
 import { QuickHistoryComponent } from './features/quick-history/quick-history.component';
+import { PlannerComponent } from './features/planner/planner.component';
+import { ScheduleComponent } from './features/schedule/schedule/schedule.component';
 
 export const APP_ROUTES: Routes = [
   {
@@ -27,15 +27,21 @@ export const APP_ROUTES: Routes = [
     canActivate: [FocusOverlayOpenGuard],
   },
   {
-    path: 'schedule',
-    component: SchedulePageComponent,
-    data: { page: 'schedule' },
+    path: 'scheduled-list',
+    component: ScheduledListPageComponent,
+    data: { page: 'scheduled-list' },
     canActivate: [FocusOverlayOpenGuard],
   },
   {
-    path: 'timeline',
-    component: TimelinePageComponent,
-    data: { page: 'timeline' },
+    path: 'planner',
+    component: PlannerComponent,
+    data: { page: 'planner' },
+    canActivate: [FocusOverlayOpenGuard],
+  },
+  {
+    path: 'schedule',
+    component: ScheduleComponent,
+    data: { page: 'schedule' },
     canActivate: [FocusOverlayOpenGuard],
   },
   {
@@ -124,12 +130,6 @@ export const APP_ROUTES: Routes = [
     data: { page: 'daily-summary' },
     canActivate: [ValidProjectIdGuard, FocusOverlayOpenGuard],
   },
-  {
-    path: 'project-overview',
-    component: ProjectOverviewPageComponent,
-    data: { page: 'project-overview' },
-  },
-
   {
     path: 'active/:subPageType',
     canActivate: [ActiveWorkContextGuard, FocusOverlayOpenGuard],

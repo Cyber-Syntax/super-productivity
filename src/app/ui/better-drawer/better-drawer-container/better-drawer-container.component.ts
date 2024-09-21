@@ -17,8 +17,8 @@ import { Observable, ReplaySubject, Subscription } from 'rxjs';
 import { distinctUntilChanged, map, share, switchMap } from 'rxjs/operators';
 import { observeWidth } from '../../../util/resize-observer-obs';
 import { MainContainerClass } from '../../../app.constants';
-import { IS_TOUCH_ONLY } from '../../../util/is-touch-only';
 import { LanguageService } from '../../../core/language/language.service';
+import { IS_TOUCH_PRIMARY } from '../../../util/is-mouse-primary';
 
 const SMALL_CONTAINER_WIDTH = 620;
 const VERY_SMALL_CONTAINER_WIDTH = 450;
@@ -128,7 +128,7 @@ export class BetterDrawerContainerComponent
 
   close(): void {
     // FORCE blur because otherwise task notes won't save
-    if (IS_TOUCH_ONLY) {
+    if (IS_TOUCH_PRIMARY) {
       document.querySelectorAll('input,textarea').forEach((element) => {
         if (element === document.activeElement) {
           return (element as HTMLElement).blur();
@@ -149,8 +149,8 @@ export class BetterDrawerContainerComponent
         ? 'transform: translateX(0);'
         : 'transform: translateX(100%);'
       : this.isOpenGet
-      ? `${margin}: 0; ${widthStyle}`
-      : `${margin}: ${-1 * this.sideWidth}%; ${widthStyle}`;
+        ? `${margin}: 0; ${widthStyle}`
+        : `${margin}: ${-1 * this.sideWidth}%; ${widthStyle}`;
   }
 
   private _updateStyle(): void {

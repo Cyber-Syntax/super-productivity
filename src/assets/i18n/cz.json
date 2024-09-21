@@ -176,13 +176,13 @@
         "IS_SEARCH_ISSUES_FROM_GITEA": "Zobrazit problémy z gitu jako návrhy při přidávání nových úkolů",
         "HOST": "Hostitel (např.: https://try.gitea.io)",
         "TOKEN": "Přístupový token",
-        "TOKEN_DESCRIPTION": "Vyžadováno pro přístup k soukromým repozitářům",
         "REPO_FULL_NAME": "Uživatelské jméno nebo název organizace/projektu",
         "REPO_FULL_NAME_DESCRIPTION": "Lze nalézt jako část adresy URL při prohlížení projektu v prohlížeči.",
         "SCOPE": "Rozsah",
         "SCOPE_ALL": "Všechny",
         "SCOPE_ASSIGNED": "Přiřazeno mně",
-        "SCOPE_CREATED": "Vytvořeno mnou"
+        "SCOPE_CREATED": "Vytvořeno mnou",
+        "TOKEN_DESCRIPTION": "Vyžadováno pro přístup k soukromým repozitářům"
       },
       "FORM_SECTION": {
         "HELP": "<p>Zde můžete nakonfigurovat SuperProductivity tak, aby zobrazoval otevřené problémy Gitea pro konkrétní repozitář v panelu vytváření úkolů v denním plánovacím zobrazení. Budou uvedeny jako návrhy a poskytnou odkaz na problém a další informace o něm.</p> <p>Kromě toho můžete automaticky přidat a importovat všechny otevřené problémy.</p><p>Pro překročení omezení a přístup můžete poskytnout přístupový token.",
@@ -225,11 +225,11 @@
         "HELP": "<p>Zde můžete nakonfigurovat SuperProductivity tak, aby zobrazoval otevřené problémy Redmine (buď online verze, nebo samonosné instance) pro konkrétní projekt v panelu vytváření úkolů v denním plánovacím zobrazení. Budou uvedeny jako návrhy a poskytnou odkaz na problém a další informace o něm.</p><p>Kromě toho můžete automaticky importovat všechny otevřené problémy.</p>"
       },
       "ISSUE_CONTENT": {
-        "AUTOR": "Autor",
-        "STAV": "Stav",
         "PRIORITY": "Priorita",
         "DESCRIPTION": "Popis",
-        "MARK_AS_CHECKED": "Označit změny jako zkontrolované"
+        "MARK_AS_CHECKED": "Označit změny jako zkontrolované",
+        "AUTOR": "Autor",
+        "STAV": "Stav"
       },
       "S": {
         "ERR_UNKNOWN": "Redmine: Neznámá chyba {{statusCode}} {{errorMsg}}."
@@ -254,14 +254,14 @@
         "TITLE": "GitHub"
       },
       "ISSUE_CONTENT": {
+        "DESCRIPTION": "Popis",
+        "MARK_AS_CHECKED": "Označit změny jako zkontrolované",
         "PRIRAZENY": "Přiřazeno",
         "U": "na",
-        "DESCRIPTION": "Popis",
         "STITKY": "Štítky",
         "POSLEDNI_KOMENTAR": "Poslední komentář",
         "NAHRAJT_VSECHNY_KOMENTARE": "Načíst všechny {{nr}} komentáře",
         "NAHRAJT_POPIS_A_VSECHNY_KOMENTARE": "Načíst popis a všechny komentáře",
-        "MARK_AS_CHECKED": "Označit změny jako zkontrolované",
         "STAV": "Stav",
         "SHRNUJ": "Shrnutí",
         "NAPSAT_KOMENTAR": "Napsat komentář"
@@ -823,12 +823,12 @@
           "L_SYNC_FILE_NAME": "Název souboru pro synchronizaci"
         },
         "LOCAL_FILE": {
+          "L_SYNC_FILE_PATH_PERMISSION_VALIDATION": "Vyžaduje oprávnění k přístupu k souboru",
           "L_SYNC_FILE_PATH": "Cesta k souboru pro synchronizaci",
-          "L_SYNC_FILE_PATH_DESCRIPTION": "Absolutní cesta k souboru, který by měl být použit pro synchronizaci (bude vytvořen).",
-          "L_SYNC_FILE_PATH_PERMISSION_VALIDATION": "Vyžaduje oprávnění k přístupu k souboru"
+          "L_SYNC_FILE_PATH_DESCRIPTION": "Absolutní cesta k souboru, který by měl být použit pro synchronizaci (bude vytvořen)."
         },
-        "L_ENABLE_SYNCING": "Povolit synchronizaci",
         "L_ENABLE_COMPRESSION": "Povolit kompresi (rychlejší přenos dat)",
+        "L_ENABLE_SYNCING": "Povolit synchronizaci",
         "L_SYNC_INTERVAL": "Interval synchronizace",
         "L_SYNC_PROVIDER": "Poskytovatel synchronizace",
         "TITLE": "Synchronizace",
@@ -836,8 +836,8 @@
           "CORS_INFO": "<strong>Jak to funguje v prohlížeči:</strong> Aby to fungovalo v prohlížeči, musíte povolit Super Productivity pro CORS požadavky pro vaši instanci Nextcloud. To může mít negativní bezpečnostní dopady! Podívejte se na <a href='https://github.com/nextcloud/server/issues/3131'>tuto diskuzi pro více informací</a>. Jeden z přístupů k tomu, aby to fungovalo na mobilu, je povolení \"https://app.super-productivity.com\" prostřednictvím aplikace Nextcloud <a href='https://apps.nextcloud.com/apps/webapppassword'>webapppassword<a>. Používejte na vlastní nebezpečí!</p>",
           "L_BASE_URL": "Základní adresa URL",
           "L_PASSWORD": "Heslo",
-          "L_SYNC_FILE_PATH": "Cesta k souboru pro synchronizaci",
-          "L_USER_NAME": "Uživatelské jméno"
+          "L_USER_NAME": "Uživatelské jméno",
+          "L_SYNC_FILE_PATH": "Cesta k souboru pro synchronizaci"
         }
       },
       "S": {
@@ -915,7 +915,7 @@
         "DELETE": "Smazat úkol",
         "DELETE_REPEAT_INSTANCE": "Smazat opakující se instanci úkolu",
         "DROP_ATTACHMENT": "Přetáhněte sem pro připojení k „{{title}}“",
-        "EDIT_REMINDER": "Upravit připomenutí",
+        "EDIT_SCHEDULED": "Upravit připomenutí",
         "EDIT_TAGS": "Upravit značky",
         "MARK_DONE": "Označit jako hotové",
         "MARK_UNDONE": "Označit jako nehotové",
@@ -929,7 +929,7 @@
         "REPEAT_EDIT": "Upravit opakující se konfiguraci úkolu",
         "SCHEDULE": "Naplánovat úkol",
         "SHOW_UPDATES": "Zobrazit aktualizace",
-        "TOGGLE_ADDITIONAL": "Zobrazit/Skrýt další informace",
+        "TOGGLE_DETAIL_PANEL": "Zobrazit/Skrýt další informace",
         "TOGGLE_ATTACHMENTS": "Zobrazit/Skrýt přílohy",
         "TOGGLE_DONE": "Označit jako hotové/nehotoé",
         "TOGGLE_SUB_TASK_VISIBILITY": "Přepnout viditelnost podúkolů",
@@ -937,11 +937,7 @@
         "TRACK_TIME_STOP": "Pozastavit sledování času",
         "UPDATE_ISSUE_DATA": "Aktualizovat údaje o problému"
       },
-      "D_REMINDER_ADD": {
-        "CONFIRM_REPEAT_OK": "Naplánovat",
-        "CONFIRM_REPEAT_TXT": "Zkoušíte naplánovat tento opakující se úkol na jiný den. Opakující se úkoly jsou obvykle určeny k opětovnému vytvoření ve stanovené dny a jsou naplánovány pouze v tento den. Chcete přesto pokračovat?",
-        "DATETIME_FOR": "Datum a čas pro připomenutí",
-        "EDIT": "Upravit připomenutí",
+      "D_SCHEDULE_TASK": {
         "MOVE_TO_BACKLOG": "Přesunout úkol do zásobníku do doby naplánování",
         "REMIND_AT": "Připomenout v",
         "RO_10M": "10 minut před začátkem",
@@ -950,8 +946,13 @@
         "RO_30M": "30 minut před začátkem",
         "RO_5M": "5 minut před začátkem",
         "RO_START": "kdy začíná",
+        "RO_NEVER": "Nikdy",
         "SCHEDULE": "Naplánovat",
-        "UNSCHEDULE": "Zrušit naplánování"
+        "UNSCHEDULE": "Zrušit naplánování",
+        "CONFIRM_REPEAT_OK": "Naplánovat",
+        "CONFIRM_REPEAT_TXT": "Zkoušíte naplánovat tento opakující se úkol na jiný den. Opakující se úkoly jsou obvykle určeny k opětovnému vytvoření ve stanovené dny a jsou naplánovány pouze v tento den. Chcete přesto pokračovat?",
+        "DATETIME_FOR": "Datum a čas pro připomenutí",
+        "EDIT": "Upravit připomenutí"
       },
       "D_REMINDER_VIEW": {
         "ADD_ALL_TO_TODAY": "Přidat vše do dneška",
@@ -1093,21 +1094,22 @@
         "WEDNESDAY": "Středa"
       }
     },
-    "TIMELINE": {
+    "SCHEDULE": {
       "CONTINUED": "pokračovalo",
       "D_INITIAL": {
         "TEXT": "<p>Myšlenkou časové osy je poskytnout lepší přehled o tom, jak se plánované úkoly vyvíjejí v čase. Automaticky vychází z vašich úkolů a rozlišuje dvě různé věci: <strong>naplánované úkoly</strong>, které jsou zobrazeny v jejich plánovaný čas, a <strong>běžné úkoly</strong>, které by se měly pohybovat kolem těchto pevných událostí. Všechny úkoly zohledňují časové odhady, které jim přiřadíte.</p><p>Kromě toho můžete zadat čas začátku a konce práce. Pokud jsou nakonfigurovány, běžné úkoly se nikdy nezobrazí mimo tyto časy. Všimněte si, že časová osa zahrnuje pouze příštích 30 dnů.</p>",
         "TITLE": "Časová osa"
       },
       "END": "Konec práce",
-      "MENU_TITLE": "Časová osa",
       "NOW": "Nyní",
       "NO_TASKS": "Momentálně zde nejsou žádné úkoly. Přidejte nějaké úkoly pomocí tlačítka + v horní liště.",
+      "START": "Začátek práce",
+      "TASK_PROJECTION_INFO": "Budoucí projekce naplánovaného opakovatelného úkolu",
+      "LUNCH_BREAK": "Obední přestávka",
+      "MENU_TITLE": "Časová osa",
       "S": {
         "CAL_PROVIDER_ERROR": "Chyba poskytovatele kalendáře Časové osy: {{errTxt}}"
-      },
-      "START": "Začátek práce",
-      "TASK_PROJECTION_INFO": "Budoucí projekce naplánovaného opakovatelného úkolu"
+      }
     },
     "TIME_TRACKING": {
       "B": {
@@ -1131,8 +1133,8 @@
         "SKIP": "Přeskočit",
         "SPLIT_TIME": "Rozdělit čas na více úkolů a přestávek",
         "TASK": "Úkol",
-        "TASK_BREAK": "Úkol + Přestávka",
-        "TRACK_TO": "Sledovat k"
+        "TRACK_TO": "Sledovat k",
+        "TASK_BREAK": "Úkol + Přestávka"
       },
       "D_TRACKING_REMINDER": {
         "CREATE_AND_TRACK": "<em>Vytvořit</em> a sledovat k",
@@ -1140,18 +1142,6 @@
         "TASK": "Úkol",
         "TRACK_TO": "Sledovat k:",
         "UNTRACKED_TIME": "Nesledovaný čas:"
-      }
-    },
-    "WELCOME": {
-      "D_WELCOME": {
-        "L1": "Začínáme",
-        "L2": "Úvodní video na YouTube",
-        "L3": "Zeptejte se na otázku",
-        "LETS_GO": "Jdeme na to!",
-        "MOBILE_INFO": "<strong>Přejetím</strong> vytvořených úkolů <strong>doprava, abyste je označili jako hotové</strong>.\n    Přejetím doleva je naplánujete. Dlouhým stisknutím získáte další možnosti.",
-        "T1": "Je skvělé vidět, že jste se rozhodli vyzkoušet tuto aplikaci! \uD83E\uDD84",
-        "T2": "Pokud máte potíže s orientací, existuje několik míst, kde můžete najít pomoc:",
-        "TITLE": "Vítejte v Super Productivity!"
       }
     },
     "WORKLOG": {
@@ -1209,6 +1199,18 @@
         "NO_DATA": "Tento týden zatím nejsou žádné úkoly.",
         "TITLE": "Název"
       }
+    },
+    "WELCOME": {
+      "D_WELCOME": {
+        "L1": "Začínáme",
+        "L2": "Úvodní video na YouTube",
+        "L3": "Zeptejte se na otázku",
+        "LETS_GO": "Jdeme na to!",
+        "MOBILE_INFO": "<strong>Přejetím</strong> vytvořených úkolů <strong>doprava, abyste je označili jako hotové</strong>.\n    Přejetím doleva je naplánujete. Dlouhým stisknutím získáte další možnosti.",
+        "T1": "Je skvělé vidět, že jste se rozhodli vyzkoušet tuto aplikaci! 🦄",
+        "T2": "Pokud máte potíže s orientací, existuje několik míst, kde můžete najít pomoc:",
+        "TITLE": "Vítejte v Super Productivity!"
+      }
     }
   },
   "FILE_IMEX": {
@@ -1219,7 +1221,6 @@
   },
   "G": {
     "CANCEL": "Zrušit",
-    "CLICK_TO_EDIT": "klikněte pro úpravu",
     "CLOSE": "Zavřít",
     "DELETE": "Smazat",
     "DISMISS": "Zamítnout",
@@ -1227,6 +1228,7 @@
     "DO_IT": "Udělej to!",
     "EDIT": "Upravit",
     "ENABLED": "Povoleno",
+    "EXAMPLE_VAL": "klikněte pro úpravu",
     "EXTENSION_INFO": "Prosím, <a target=\"_blank\" href=\"https://chrome.google.com/webstore/detail/super-productivity/ljkbjodfmekklcoibdnhahlaalhihmlb\"> stáhněte rozšíření pro Chrome</a> pro umožnění komunikace s rozhraním Jira Api a zacházením s nečinným časem. Upozornění, tato funkce nefunguje na mobilních zařízeních.",
     "LOGIN": "Přihlásit",
     "LOGOUT": "Odhlásit",
@@ -1268,9 +1270,9 @@
       "HELP": "<div><p>Když je zacházení s nečinným časem povoleno, po uplynutí určité doby se zobrazí dialogové okno, ve kterém můžete zkontrolovat, zda a na jaký úkol chcete sledovat svůj čas po období nečinnosti.</p></div>",
       "IS_ENABLE_IDLE_TIME_TRACKING": "Povolit zacházení s nečinným časem",
       "IS_ONLY_OPEN_IDLE_WHEN_CURRENT_TASK": "Otevřít dialogové okno nečinnosti pouze při vybraném aktuálním úkolu",
-      "IS_UN_TRACKED_IDLE_RESETS_BREAK_TIMER": "Nečinný čas bez sledování obnovuje časovač přestávky",
       "MIN_IDLE_TIME": "Spustit nečinnost po X",
-      "TITLE": "Zacházení s nečinným časem"
+      "TITLE": "Zacházení s nečinným časem",
+      "IS_UN_TRACKED_IDLE_RESETS_BREAK_TIMER": "Nečinný čas bez sledování obnovuje časovač přestávky"
     },
     "IMEX": {
       "HELP": "<p>Zde můžete exportovat všechna data jako <strong>JSON</strong> pro zálohování, ale také pro použití v jiném kontextu (např. můžete exportovat své projekty v prohlížeči a importovat je do desktopové verze).</p> <p>Import očekává platný formát JSON, který je zkopírován do textové oblasti. <strong>POZNÁMKA: Jakmile stisknete tlačítko importu, všechna vaše aktuální nastavení a data budou přepsána!</strong></p>",
@@ -1290,7 +1292,7 @@
       "GO_TO_FOCUS_MODE": "Vstoupit do režimu zaměření",
       "GO_TO_SCHEDULED_VIEW": "Přejít na naplánované úkoly",
       "GO_TO_SETTINGS": "Přejít do nastavení",
-      "GO_TO_TIMELINE": "Přejít na časovou osu",
+      "GO_TO_SCHEDULE": "Přejít na časovou osu",
       "GO_TO_WORK_VIEW": "Přejít na pracovní pohled",
       "HELP": "<p>Zde můžete konfigurovat všechny klávesové zkratky.</p> <p>Klikněte na vstupní text a zadejte požadovanou kombinaci kláves. Stiskněte Enter pro uložení a Escape pro zrušení.</p> <p>Existují tři typy zkratk:</p> <ul> <li> <strong>Globální zkratky:</strong> Když je aplikace spuštěna, spustí akci z jakékoliv jiné aplikace. </li> <li> <strong>Zkratky na úrovni aplikace:</strong> Spustí se z libovolné obrazovky aplikace, pokud právě neupravujete textové pole. </li> <li> <strong>Zkratky na úrovni úkolu:</strong> Spustí se pouze tehdy, pokud jste vybrali úkol pomocí myši nebo klávesnice a obvykle spustí akci specifickou pro tento úkol. </li> </ul><p>Můžete <strong>stisknout Escape k odebrání zkratky.</strong></p>",
       "MOVE_TASK_DOWN": "Přesunout úkol dolů v seznamu",
@@ -1305,6 +1307,7 @@
       "SHOW_SEARCH_BAR": "Zobrazit vyhledávací panel",
       "SYSTEM_SHORTCUTS": "Globální zkratky (systémové)",
       "TASK_ADD_SUB_TASK": "Přidat podúkol",
+      "TASK_ADD_ATTACHMENT": "Připojit soubor nebo odkaz",
       "TASK_DELETE": "Smazat úkol",
       "TASK_EDIT_TAGS": "Upravit štítky",
       "TASK_EDIT_TITLE": "Upravit název",
@@ -1314,7 +1317,7 @@
       "TASK_SCHEDULE": "Naplánovat úkol",
       "TASK_SHORTCUTS": "Úkoly",
       "TASK_SHORTCUTS_INFO": "Následující zkratky platí pro aktuálně vybraný úkol (vybraný pomocí záložky nebo myší) a obvykle spouštějí akci specifickou pro tento úkol.",
-      "TASK_TOGGLE_ADDITIONAL_INFO_OPEN": "Zobrazit/skrýt další informace o úkolu",
+      "TASK_TOGGLE_DETAIL_PANEL_OPEN": "Zobrazit/skrýt další informace o úkolu",
       "TASK_TOGGLE_DONE": "Přepnout stav hotovo",
       "TITLE": "Klávesové zkratky",
       "TOGGLE_BACKLOG": "Zobrazit/skrýt zásobník úkolů",
@@ -1325,31 +1328,6 @@
       "ZOOM_IN": "Přiblížit (pouze pro desktop)",
       "ZOOM_OUT": "Oddálit (pouze pro desktop)"
     },
-    "LANG": {
-      "AR": "Arabic",
-      "CZ": "Czech",
-      "DE": "German",
-      "EN": "English",
-      "ES": "Spanish",
-      "FA": "Farsi",
-      "FR": "French",
-      "HR": "Croatian",
-      "ID": "Indonesian",
-      "IT": "Italian",
-      "JA": "Japanese",
-      "KO": "Korean",
-      "LABEL": "Please select a language",
-      "NB": "Norwegian Bokmål",
-      "NL": "Dutch",
-      "PL": "Polish",
-      "PT": "Portuguese",
-      "RU": "Russian",
-      "SK": "Slovak",
-      "TITLE": "Language",
-      "TR": "Turkish",
-      "ZH": "Simplified Chinese",
-      "ZH_TW": "Traditional Chinese"
-    },
     "MISC": {
       "DEFAULT_PROJECT": "Výchozí projekt pro použití pro úkoly, pokud není žádný určen",
       "FIRST_DAY_OF_WEEK": "První den týdne",
@@ -1358,18 +1336,18 @@
       "HELP": "<p><strong>Desktopová upozornění se nezobrazují?</strong> Pro systém Windows byste mohli zkontrolovat Systém > Upozornění a akce a zkontrolovat, zda jsou vyžadovaná upozornění povolena.</p>",
       "IS_AUTO_ADD_WORKED_ON_TO_TODAY": "Automaticky přidat značku 'Dnes' k úkolům, na kterých jste pracovali",
       "IS_AUTO_MARK_PARENT_AS_DONE": "Označit nadřazený úkol jako hotový, když jsou hotovy všechny podúkoly",
-      "IS_AUTO_START_NEXT_TASK": "Začít sledovat další úkol při označení aktuálního jako hotového",
       "IS_CONFIRM_BEFORE_EXIT": "Potvrdit před ukončením aplikace",
       "IS_CONFIRM_BEFORE_EXIT_WITHOUT_FINISH_DAY": "Potvrdit před ukončením aplikace bez dokončení dne",
       "IS_DARK_MODE": "Temný režim",
       "IS_DISABLE_ANIMATIONS": "Vypnout všechny animace",
       "IS_HIDE_NAV": "Skrýt navigaci, dokud není nadpis záhlaví aktivován (pouze pro desktop)",
       "IS_MINIMIZE_TO_TRAY": "Minimalizovat do oznamovací oblasti (pouze pro desktop)",
-      "IS_NOTIFY_WHEN_TIME_ESTIMATE_EXCEEDED": "Upozornit, když byl překročen odhad času",
       "IS_TRAY_SHOW_CURRENT_TASK": "Zobrazit aktuální úkol v oznamovací oblasti/menu stavu (pouze pro desktop Mac/Windows)",
       "IS_TURN_OFF_MARKDOWN": "Vypnout zpracování markdown pro poznámky k úkolům",
       "TASK_NOTES_TPL": "Šablona popisu úkolu",
-      "TITLE": "Různá nastavení"
+      "TITLE": "Různá nastavení",
+      "IS_AUTO_START_NEXT_TASK": "Začít sledovat další úkol při označení aktuálního jako hotového",
+      "IS_NOTIFY_WHEN_TIME_ESTIMATE_EXCEEDED": "Upozornit, když byl překročen odhad času"
     },
     "POMODORO": {
       "BREAK_DURATION": "Délka krátkých přestávek",
@@ -1408,17 +1386,17 @@
       "SNOOZE_TIME": "Doba odložení, když máte přestávku",
       "TITLE": "Připomenutí o přestávce"
     },
-    "TIMELINE": {
-      "CAL_PROVIDERS": "Poskytovatelé kalendáře (experimentální a volitelní)",
-      "CAL_PROVIDERS_ADD": "Přidat zdroj iCal",
-      "CAL_PROVIDERS_INFO": "Můžete volitelně nakonfigurovat časovou osu tak, aby také načítala a zobrazovala data z iCal (např. <a href=\"https://support.google.com/calendar/answer/37648?hl=cs#zippy=%2Csync-your-google-calendar-view-edit%2Cget-your-calendar-view-only\">Google Calendar</a>).",
-      "HELP": "Funkce časové osy by vám měla poskytnout rychlý přehled o tom, jak se plánované úkoly vyvíjejí v čase. Najdete ji v levém bočním menu pod <a href='#/timeline'>‘Časová osa’</a>.",
-      "L_CAL_PATH": "URL/cesta k souboru pro kalendář ICAL (volitelně)",
+    "SCHEDULE": {
+      "HELP": "Funkce časové osy by vám měla poskytnout rychlý přehled o tom, jak se plánované úkoly vyvíjejí v čase. Najdete ji v levém bočním menu pod <a href='#/schedule'>‘Časová osa’</a>.",
       "L_IS_WORK_START_END_ENABLED": "Omezit tok nerozvržených úkolů na konkrétní pracovní časy",
       "L_WORK_END": "Konec pracovního dne",
       "L_WORK_START": "Začátek pracovního dne",
       "TITLE": "Časová osa",
-      "WORK_START_END_DESCRIPTION": "např. 17:00"
+      "WORK_START_END_DESCRIPTION": "např. 17:00",
+      "CAL_PROVIDERS": "Poskytovatelé kalendáře (experimentální a volitelní)",
+      "CAL_PROVIDERS_ADD": "Přidat zdroj iCal",
+      "CAL_PROVIDERS_INFO": "Můžete volitelně nakonfigurovat časovou osu tak, aby také načítala a zobrazovala data z iCal (např. <a href=\"https://support.google.com/calendar/answer/37648?hl=cs#zippy=%2Csync-your-google-calendar-view-edit%2Cget-your-calendar-view-only\">Google Calendar</a>).",
+      "L_CAL_PATH": "URL/cesta k souboru pro kalendář ICAL (volitelně)"
     },
     "TRACKING_REMINDER": {
       "HELP": "Nakonfigurujte banner, který se zobrazí, pokud jste zapomněli spustit sledování času.",
@@ -1457,7 +1435,6 @@
     "DELETE_TAG": "Smazat štítek",
     "GO_TO_TASK_LIST": "Přejít na seznam úkolů",
     "HELP": "Nápověda",
-    "MANAGE_PROJECTS": "Spravovat projekty",
     "METRICS": "Metryky",
     "NOTES": "Poznámky",
     "NOTES_PANEL_INFO": "Poznámky lze zobrazit pouze z časové osy a standardního pohledu na seznam úkolů.",
@@ -1466,7 +1443,6 @@
     "PROJECT_MENU": "Menu projektu",
     "PROJECT_SETTINGS": "Nastavení projektu",
     "QUICK_HISTORY": "Rychlá historie",
-    "SCHEDULED": "Naplánováno",
     "SETTINGS": "Nastavení",
     "SHOW_SEARCH_BAR": "Zobrazit vyhledávací lištu",
     "TAGS": "Štítky",
@@ -1476,7 +1452,9 @@
     "TOGGLE_SHOW_NOTES": "Zobrazit/Skrýt poznámky k projektu",
     "TOGGLE_TRACK_TIME": "Spustit/Zastavit sledování času",
     "TRIGGER_SYNC": "Spustit synchronizaci ručně",
-    "WORKLOG": "Pracovní záznam"
+    "WORKLOG": "Pracovní záznam",
+    "MANAGE_PROJECTS": "Spravovat projekty",
+    "SCHEDULED": "Naplánováno"
   },
   "PDS": {
     "BACK": "Počkej, zapomněl jsem na něco!",
@@ -1489,10 +1467,8 @@
       "OK": "Ano, vypnout!"
     },
     "ESTIMATE_TOTAL": "Celkový odhad:",
-    "EVALUATION": "Hodnocení",
     "EXPORT_TASK_LIST": "Exportovat seznam úkolů",
     "NO_TASKS": "Pro tento den nejsou žádné úkoly",
-    "PLAN": "Plán",
     "ROUND_15M": "Zaokrouhlit všechny úkoly na 15 minut",
     "ROUND_30M": "Zaokrouhlit všechny úkoly na 30 minut",
     "ROUND_5M": "Zaokrouhlit všechny úkoly na 5 minut",
@@ -1507,44 +1483,17 @@
     "START_END": "Začátek – Konec",
     "SUMMARY_FOR": "Denní shrnutí pro {{dayStr}}",
     "TASKS_COMPLETED": "Hotové úkoly",
-    "TASK_LIST": "Seznam úkolů",
     "TIME_SPENT_AND_ESTIMATE_LABEL": "Strávený čas / Odhadovaný",
     "TIME_SPENT_ESTIMATE_TITLE": "Strávený čas: Celkový čas strávený dnes. Archivované úkoly nejsou zahrnuty. – Čas odhadovaný: Čas odhadovaný pro úkoly pracované dnes minus čas již strávený s nimi v jiné dny.",
     "TIME_SPENT_TODAY_BY_TAG": "Strávený čas dnes podle štítku",
-    "TODAY": "Dnes",
-    "WEEK": "Týden"
+    "WEEK": "Týden",
+    "EVALUATION": "Hodnocení",
+    "PLAN": "Plán",
+    "TASK_LIST": "Seznam úkolů",
+    "TODAY": "Dnes"
   },
   "PM": {
     "TITLE": "Projektová metrika"
-  },
-  "PP": {
-    "ARCHIVED_PROJECTS": "Archivované projekty",
-    "ARCHIVE_PROJECT": "Archivovat projekt",
-    "CLICK_TO_HIDE": "Klikněte pro skrytí projektu z menu",
-    "CLICK_TO_SHOW": "Klikněte pro zobrazení projektu v menu",
-    "DELETE_PROJECT": "Smazat projekt",
-    "D_CONFIRM_ARCHIVE": {
-      "MSG": "Opravdu chcete tento projekt archivovat? Archivované projekty se v menu již nezobrazují, a nemůžete přistupovat k žádným jejich datům bez obnovení. Doporučuje se zálohovat data před provedením této akce.",
-      "OK": "Archivovat"
-    },
-    "D_CONFIRM_DELETE": {
-      "MSG": "Opravdu chcete tento projekt smazat? Doporučuje se zálohovat data před provedením této akce.",
-      "OK": "Smazat"
-    },
-    "D_CONFIRM_UNARCHIVE": {
-      "MSG": "Opravdu chcete tento projekt znovu zarchivovat?",
-      "OK": "Odzarchivovat"
-    },
-    "EDIT_PROJECT": "Upravit projekt",
-    "EXPORT_PROJECT": "Exportovat projekt",
-    "GITHUB_CONFIGURED": "Nastavena integrace GitHubu",
-    "GITLAB_CONFIGURED": "Nastavena integrace GitLabu",
-    "IMPORT_FROM_FILE": "Importovat z souboru",
-    "JIRA_CONFIGURED": "Nastavena integrace Jiry",
-    "OPEN_PROJECT_CONFIGURED": "Nastavena integrace OpenProjectu",
-    "S_INVALID_JSON": "Neplatný JSON pro soubor s projektem",
-    "TITLE": "Přehled projektu",
-    "UN_ARCHIVE_PROJECT": "Odzarchivovat projekt"
   },
   "PS": {
     "GLOBAL_SETTINGS": "Celková nastavení",
@@ -1611,5 +1560,34 @@
     "TIME_ESTIMATED": "Odhadovaný čas:",
     "WITHOUT_BREAK": "Bez přestávky:",
     "WORKING_TODAY": "Pracujete dnes:"
+  },
+  "PP": {
+    "ARCHIVED_PROJECTS": "Archivované projekty",
+    "ARCHIVE_PROJECT": "Archivovat projekt",
+    "CLICK_TO_HIDE": "Klikněte pro skrytí projektu z menu",
+    "CLICK_TO_SHOW": "Klikněte pro zobrazení projektu v menu",
+    "DELETE_PROJECT": "Smazat projekt",
+    "D_CONFIRM_ARCHIVE": {
+      "MSG": "Opravdu chcete tento projekt archivovat? Archivované projekty se v menu již nezobrazují, a nemůžete přistupovat k žádným jejich datům bez obnovení. Doporučuje se zálohovat data před provedením této akce.",
+      "OK": "Archivovat"
+    },
+    "D_CONFIRM_DELETE": {
+      "MSG": "Opravdu chcete tento projekt smazat? Doporučuje se zálohovat data před provedením této akce.",
+      "OK": "Smazat"
+    },
+    "D_CONFIRM_UNARCHIVE": {
+      "MSG": "Opravdu chcete tento projekt znovu zarchivovat?",
+      "OK": "Odzarchivovat"
+    },
+    "EDIT_PROJECT": "Upravit projekt",
+    "EXPORT_PROJECT": "Exportovat projekt",
+    "GITHUB_CONFIGURED": "Nastavena integrace GitHubu",
+    "GITLAB_CONFIGURED": "Nastavena integrace GitLabu",
+    "IMPORT_FROM_FILE": "Importovat z souboru",
+    "JIRA_CONFIGURED": "Nastavena integrace Jiry",
+    "OPEN_PROJECT_CONFIGURED": "Nastavena integrace OpenProjectu",
+    "S_INVALID_JSON": "Neplatný JSON pro soubor s projektem",
+    "TITLE": "Přehled projektu",
+    "UN_ARCHIVE_PROJECT": "Odzarchivovat projekt"
   }
 }

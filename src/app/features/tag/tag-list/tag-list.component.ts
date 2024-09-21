@@ -1,24 +1,17 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  EventEmitter,
-  Input,
-  OnDestroy,
-  Output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { standardListAnimation } from '../../../ui/animations/standard-list.ani';
 import { Tag } from '../tag.model';
-import { TagService } from '../tag.service';
-import { BehaviorSubject, combineLatest, Observable, of, Subscription } from 'rxjs';
-import { map, switchMap } from 'rxjs/operators';
 import { MatDialog } from '@angular/material/dialog';
 import { Task } from '../../tasks/task.model';
-import { DialogEditTagsForTaskComponent } from '../dialog-edit-tags/dialog-edit-tags-for-task.component';
-import { ProjectService } from '../../project/project.service';
 import { WorkContextService } from '../../work-context/work-context.service';
 import { WorkContextType } from '../../work-context/work-context.model';
-import { TagComponentTag } from '../tag/tag.component';
 import { expandFadeAnimation } from '../../../ui/animations/expand.ani';
+import { NO_LIST_TAG } from '../tag.const';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { Store } from '@ngrx/store';
+import { selectTagFeatureState } from '../store/tag.reducer';
+import { selectProjectFeatureState } from '../../project/store/project.selectors';
+import { Project } from '../../project/project.model';
 
 @Component({
   selector: 'tag-list',
@@ -27,103 +20,52 @@ import { expandFadeAnimation } from '../../../ui/animations/expand.ani';
   changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [standardListAnimation, expandFadeAnimation],
 })
-export class TagListComponent implements OnDestroy {
-  @Input() isDisableEdit: boolean = false;
-  @Output() addedTagsToTask: EventEmitter<string[]> = new EventEmitter();
-  @Output() removedTagsFromTask: EventEmitter<string[]> = new EventEmitter();
-  @Output() replacedTagForTask: EventEmitter<string[]> = new EventEmitter();
-  projectTag?: TagComponentTag | null;
-  tags: Tag[] = [];
-  private _isShowProjectTagAlways$: BehaviorSubject<boolean> =
-    new BehaviorSubject<boolean>(false);
-  private _isShowProjectTagNever$: BehaviorSubject<boolean> =
-    new BehaviorSubject<boolean>(false);
-  private _projectId$: BehaviorSubject<string | null> = new BehaviorSubject<
-    string | null
-  >(null);
-  projectTag$: Observable<TagComponentTag | null> = combineLatest([
-    this._workContextService.activeWorkContextTypeAndId$,
-    this._isShowProjectTagAlways$,
-    this._isShowProjectTagNever$,
-  ]).pipe(
-    switchMap(([{ activeType }, isShowProjectTagAlways, isShowProjectTagNever]) =>
-      !isShowProjectTagNever &&
-      (isShowProjectTagAlways || activeType === WorkContextType.TAG)
-        ? this._projectId$.pipe(
-            switchMap((id) => (id ? this._projectService.getByIdOnce$(id) : of(null))),
-            map(
-              (project) =>
-                project && {
-                  ...project,
-                  icon: 'list',
-                },
-            ),
-          )
-        : of(null),
-    ),
-  );
-  private _tagIds$: BehaviorSubject<string[]> = new BehaviorSubject<string[]>([]);
-  tags$: Observable<Tag[]> = combineLatest([
-    this._tagIds$,
-    this._workContextService.activeWorkContextId$,
-  ]).pipe(
-    // TODO there should be a better way...
-    switchMap(([ids, activeId]) =>
-      this._tagService.getTagsByIds$(
-        ids.filter((id) => id !== activeId),
-        true,
-      ),
-    ),
-  );
-  // private _hideId: string = this._workContextService.activeWorkContextId;
-  private _subs: Subscription = new Subscription();
+export class TagListComponent {
+  task = input.required<Task>();
+
+  isShowProjectTagAlways = input(false);
+  isShowProjectTagNever = input(false);
+  workContext = toSignal(this._workContextService.activeWorkContextTypeAndId$);
+  // TODO this can be faster if we create a separate selector for just the stuff we need
+  tagState = toSignal(this._store.select(selectTagFeatureState));
+  // TODO this can be faster if we create a separate selector for just the stuff we need
+  projectState = toSignal(this._store.select(selectProjectFeatureState));
+
+  tagIds = computed<string[]>(() => this.task().tagIds || []);
+  tags = computed<Tag[]>(() => {
+    const tagIdsFiltered: string[] = this.tagIds().filter(
+      (id) => id !== this.workContext()?.activeId && id !== NO_LIST_TAG.id,
+    );
+    const tagsI = tagIdsFiltered.map((id) => this.tagState()?.entities[id]);
+    const projectId = this.projectId();
+    const project = projectId && (this.projectState()?.entities[projectId] as Project);
+    if (project) {
+      const projectTag: Tag = {
+        ...project,
+        color: project.theme.primary,
+        created: 0,
+        icon: project.icon || 'folder_special',
+      };
+      return [projectTag, ...(tagsI || [])] as Tag[];
+    }
+    return (tagsI as Tag[]) || [];
+  });
+
+  projectId = computed<string | null>(() => {
+    if (this.isShowProjectTagNever()) {
+      return null;
+    } else if (
+      this.isShowProjectTagAlways() ||
+      this.workContext()?.activeType === WorkContextType.TAG
+    ) {
+      return this.task().projectId;
+    }
+    return null;
+  });
 
   constructor(
-    private readonly _tagService: TagService,
-    private readonly _projectService: ProjectService,
+    private readonly _store: Store,
     private readonly _workContextService: WorkContextService,
     private readonly _matDialog: MatDialog,
-  ) {
-    this._subs.add(this.projectTag$.subscribe((v) => (this.projectTag = v)));
-    this._subs.add(this.tags$.subscribe((v) => (this.tags = v)));
-  }
-
-  @Input() set isShowProjectTagAlways(v: boolean) {
-    this._isShowProjectTagAlways$.next(v);
-  }
-
-  @Input() set isShowProjectTagNever(v: boolean) {
-    this._isShowProjectTagNever$.next(v);
-  }
-
-  // NOTE: should normally be enough
-
-  private _task?: Task;
-
-  @Input() set task(task: Task) {
-    this._task = task;
-    if (this._tagIds$.getValue() !== task.tagIds) {
-      this._tagIds$.next(task.tagIds);
-    }
-    if (this._projectId$.getValue() !== task.projectId) {
-      this._projectId$.next(task.projectId);
-    }
-  }
-
-  ngOnDestroy(): void {
-    this._subs.unsubscribe();
-  }
-
-  editTags(): void {
-    this._matDialog.open(DialogEditTagsForTaskComponent, {
-      restoreFocus: true,
-      data: {
-        task: this._task,
-      },
-    });
-  }
-
-  trackByFn(i: number, tag: Tag): number | string {
-    return tag ? tag.id : i;
-  }
+  ) {}
 }

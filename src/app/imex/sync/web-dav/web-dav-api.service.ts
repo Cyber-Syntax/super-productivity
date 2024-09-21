@@ -3,18 +3,23 @@ import { Observable } from 'rxjs';
 import { GlobalConfigService } from '../../../features/config/global-config.service';
 import { DataInitService } from '../../../core/data-init/data-init.service';
 import { first, map, switchMap, tap } from 'rxjs/operators';
-// @ts-ignore
-import { createClient } from 'webdav/web';
+
 import { WebDavHeadResponse } from './web-dav.model';
 import { IS_ANDROID_WEB_VIEW } from '../../../util/is-android-web-view';
 import { androidInterface } from '../../../features/android/android-interface';
 import { IncomingHttpHeaders } from 'http';
 
-// const createClient = (...args: any) => ({
-//   stat: async (a: any): Promise<any> => undefined,
-//   getFileContents: async (a: any, b?: any): Promise<any> => undefined,
-//   putFileContents: async (a: any, b?: any): Promise<any> => undefined,
-// });
+// Get the Type, but keep the actual bundle payload out
+// import type { createClient } from 'webdav';
+import { createClient } from 'webdav/web';
+
+type CreateClientType = typeof createClient;
+
+// Lazyload the webdav bundle (when requested)
+// const LazyWebDavCreateClient = (): Promise<CreateClientType> =>
+//   import(/* webpackChunkName: "webdav-web" */ 'webdav/web').then(
+//     ({ createClient }) => createClient as CreateClientType,
+//   );
 
 interface AndroidHttpResponse {
   data: string;
@@ -34,7 +39,7 @@ export class WebDavApiService {
     baseUrl: string;
     userName: string;
     password: string;
-    syncFilePath: string;
+    syncFolderPath: string;
   }> = this._globalConfigService.cfg$.pipe(
     map(
       (cfg) =>
@@ -42,14 +47,15 @@ export class WebDavApiService {
           baseUrl: string;
           userName: string;
           password: string;
-          syncFilePath: string;
+          syncFolderPath: string;
         },
     ),
   );
 
   isAllConfigDataAvailable$: Observable<boolean> = this._cfg$.pipe(
     map(
-      (cfg) => !!(cfg && cfg.userName && cfg.baseUrl && cfg.syncFilePath && cfg.password),
+      (cfg) =>
+        !!(cfg && cfg.userName && cfg.baseUrl && cfg.syncFolderPath && cfg.password),
     ),
   );
 
@@ -60,12 +66,24 @@ export class WebDavApiService {
       first(),
     );
 
+  // private _lazyWebDavClientCache: Promise<CreateClientType> | null = null;
+
   constructor(
     private _globalConfigService: GlobalConfigService,
     private _dataInitService: DataInitService,
   ) {}
 
+  private getWebDavClientCreator(): Promise<CreateClientType> {
+    return Promise.resolve(createClient);
+    // return (
+    // this._lazyWebDavClientCache ??
+    // (this._lazyWebDavClientCache = LazyWebDavCreateClient())
+    // );
+  }
+
   private checkErrorAndroid(result: AndroidHttpResponse): void {
+    console.log(result);
+
     if (result.status < 200 || result.status > 299) {
       const error = new Error(
         `Invalid response: ${result.status} ${result.statusText}`,
@@ -81,22 +99,52 @@ export class WebDavApiService {
     const cfg = await this._cfg$.pipe(first()).toPromise();
     if (IS_ANDROID_WEB_VIEW && androidInterface.makeHttpRequest) {
       const result = (await androidInterface.makeHttpRequestWrapped(
-        cfg.baseUrl + '/' + path,
+        this._getUrl(path, cfg),
         'PUT',
-        JSON.stringify(data),
+        data,
+        // JSON.stringify(data),
         cfg.userName,
         cfg.password,
         false,
       )) as AndroidHttpResponse;
       this.checkErrorAndroid(result);
     } else {
-      const client = createClient(cfg.baseUrl, {
+      const webDavClientCreator = await this.getWebDavClientCreator();
+
+      const client = webDavClientCreator(cfg.baseUrl, {
         username: cfg.userName,
         password: cfg.password,
       });
 
-      return await client.putFileContents(path, JSON.stringify(data), {
+      await client.putFileContents(path, data, {
         contentLength: false,
+      });
+    }
+  }
+
+  async createFolder({ folderPath }: { folderPath: string }): Promise<void> {
+    await this._isReady$.toPromise();
+    const cfg = await this._cfg$.pipe(first()).toPromise();
+    if (IS_ANDROID_WEB_VIEW && androidInterface.makeHttpRequest) {
+      // TODO check on real android
+      const result = (await androidInterface.makeHttpRequestWrapped(
+        new URL(folderPath, cfg.baseUrl).toString(),
+        'MKCOL',
+        '',
+        cfg.userName,
+        cfg.password,
+        false,
+      )) as AndroidHttpResponse;
+      this.checkErrorAndroid(result);
+    } else {
+      const webDavClientCreator = await this.getWebDavClientCreator();
+
+      const client = webDavClientCreator(cfg.baseUrl, {
+        username: cfg.userName,
+        password: cfg.password,
+      });
+      await client.createDirectory(folderPath, {
+        recursive: true,
       });
     }
   }
@@ -106,7 +154,7 @@ export class WebDavApiService {
     const cfg = await this._cfg$.pipe(first()).toPromise();
     if (IS_ANDROID_WEB_VIEW && androidInterface.makeHttpRequest) {
       const result = (await androidInterface.makeHttpRequestWrapped(
-        cfg.baseUrl + '/' + path,
+        this._getUrl(path, cfg),
         'HEAD',
         '',
         cfg.userName,
@@ -114,13 +162,18 @@ export class WebDavApiService {
         false,
       )) as AndroidHttpResponse;
       this.checkErrorAndroid(result);
+      console.log({ result });
       return result.headers as WebDavHeadResponse;
     } else {
-      const client = createClient(cfg.baseUrl, {
+      const webDavClientCreator = await this.getWebDavClientCreator();
+
+      const client = webDavClientCreator(cfg.baseUrl, {
         username: cfg.userName,
         password: cfg.password,
       });
       const r = await client.customRequest(path, { method: 'HEAD' });
+      console.log({ r });
+
       return r.headers;
     }
   }
@@ -136,7 +189,7 @@ export class WebDavApiService {
     const cfg = await this._cfg$.pipe(first()).toPromise();
     if (IS_ANDROID_WEB_VIEW && androidInterface.makeHttpRequest) {
       const result = (await androidInterface.makeHttpRequestWrapped(
-        cfg.baseUrl + '/' + path,
+        this._getUrl(path, cfg),
         'GET',
         '',
         cfg.userName,
@@ -144,14 +197,28 @@ export class WebDavApiService {
         true,
       )) as AndroidHttpResponse;
       this.checkErrorAndroid(result);
-      return JSON.parse(result.data);
+      return result.data;
     } else {
-      const client = createClient(cfg.baseUrl, {
+      const webDavClientCreator = await this.getWebDavClientCreator();
+
+      const client = webDavClientCreator(cfg.baseUrl, {
         username: cfg.userName,
         password: cfg.password,
       });
       const r = await client.getFileContents(path, { format: 'text' });
       return r as any;
     }
+  }
+
+  private _getUrl(
+    path: string,
+    cfg: {
+      baseUrl: string;
+      userName: string;
+      password: string;
+      syncFolderPath: string;
+    },
+  ): string {
+    return new URL(path, cfg.baseUrl).toString();
   }
 }

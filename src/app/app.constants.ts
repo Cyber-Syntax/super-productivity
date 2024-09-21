@@ -3,11 +3,14 @@ export const IS_ELECTRON = navigator.userAgent.toLowerCase().indexOf(' electron/
 export const TRACKING_INTERVAL = 1000;
 
 export const MODEL_VERSION_KEY = '__modelVersion';
+export const DRAG_DELAY_FOR_TOUCH = 75;
+export const DRAG_DELAY_FOR_TOUCH_LONGER = 150;
 
 import '@angular/common/locales/global/en';
 import '@angular/common/locales/global/es';
 import '@angular/common/locales/global/de';
 import '@angular/common/locales/global/ar';
+import '@angular/common/locales/global/cs';
 import '@angular/common/locales/global/fa';
 import '@angular/common/locales/global/fr';
 import '@angular/common/locales/global/ja';
@@ -24,6 +27,7 @@ import '@angular/common/locales/global/nl';
 import '@angular/common/locales/global/nb';
 import '@angular/common/locales/global/hr';
 
+export const DAY_STARTS_AT_DEFAULT_H = 9;
 export const DAY_STARTS_AT: string = '9:00';
 
 export const ALL_THEMES: string[] = [
@@ -71,7 +75,7 @@ export enum LanguageCode {
 export enum LanguageCodeMomentMap {
   ar = 'ar',
   de = 'de',
-  cz = 'cz',
+  cz = 'cs',
   en = 'en',
   es = 'es',
   fa = 'fa',
@@ -112,6 +116,9 @@ export enum BodyClass {
   isEnabledBackgroundGradient = 'isEnabledBackgroundGradient',
   isDisableAnimations = 'isDisableAnimations',
   isDataImportInProgress = 'isDataImportInProgress',
+
+  isAndroidKeyboardShown = 'isAndroidKeyboardShown',
+  isAndroidKeyboardHidden = 'isAndroidKeyboardHidden',
 }
 
 export enum MainContainerClass {
@@ -139,6 +146,7 @@ export const AUTO_SWITCH_LNGS: LanguageCode[] = [
 
 export const RTL_LANGUAGES: LanguageCode[] = [LanguageCode.ar, LanguageCode.fa];
 
+/* eslint-disable @typescript-eslint/naming-convention */
 export enum THEME_COLOR_MAP {
   'light-blue' = '#03a9f4',
   'pink' = '#e91e63',

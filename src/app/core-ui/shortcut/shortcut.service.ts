@@ -17,11 +17,23 @@ import { TranslateService } from '@ngx-translate/core';
 import { T } from '../../t.const';
 import { Store } from '@ngrx/store';
 import { showFocusOverlay } from '../../features/focus-mode/store/focus-mode.actions';
+import { SyncProviderService } from '../../imex/sync/sync-provider.service';
+import { first, mapTo, switchMap } from 'rxjs/operators';
+import { fromEvent, merge, Observable, of } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ShortcutService {
+  isCtrlPressed$: Observable<boolean> = fromEvent(document, 'keydown').pipe(
+    switchMap((ev: Event) => {
+      const e = ev as KeyboardEvent;
+      if (e.ctrlKey) {
+        return merge(of(true), fromEvent(document, 'keyup').pipe(mapTo(false)));
+      }
+      return of(false);
+    }),
+  );
   backlogPos?: number;
 
   constructor(
@@ -36,6 +48,7 @@ export class ShortcutService {
     private _uiHelperService: UiHelperService,
     private _bookmarkService: BookmarkService,
     private _translateService: TranslateService,
+    private _syncProviderService: SyncProviderService,
     private _ngZone: NgZone,
     private _store: Store,
   ) {
@@ -71,7 +84,7 @@ export class ShortcutService {
     }
   }
 
-  handleKeyDown(ev: KeyboardEvent): void {
+  async handleKeyDown(ev: KeyboardEvent): Promise<void> {
     const cfg = this._configService.cfg;
     if (!cfg) {
       throw new Error();
@@ -150,6 +163,11 @@ export class ShortcutService {
     } else if (checkKeyCombo(ev, keys.openProjectNotes)) {
       ev.preventDefault();
       this._layoutService.toggleNotes();
+    } else if (checkKeyCombo(ev, keys.triggerSync)) {
+      ev.preventDefault();
+      if (await this._syncProviderService.isEnabled$.pipe(first()).toPromise()) {
+        this._syncProviderService.sync();
+      }
     } else if (checkKeyCombo(ev, keys.toggleBookmarks)) {
       ev.preventDefault();
       if (this._workContextService.activeWorkContextType === WorkContextType.PROJECT) {

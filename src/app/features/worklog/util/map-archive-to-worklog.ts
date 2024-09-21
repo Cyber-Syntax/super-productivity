@@ -2,9 +2,10 @@ import { EntityState } from '@ngrx/entity';
 import { Task } from '../../tasks/task.model';
 import { getWeeksInMonth } from '../../../util/get-weeks-in-month';
 import { getWeekNumber } from '../../../util/get-week-number';
-import * as moment from 'moment';
+import moment from 'moment';
 import {
   Worklog,
+  WorklogDataForDay,
   WorklogDay,
   WorklogMonth,
   WorklogWeek,
@@ -24,10 +25,10 @@ const _getTimeSpentOnDay = (entities: any, task: Task): { [key: string]: number 
     const parentLogEntryDate =
       parentSpentOnDay &&
       (Object.keys(parentSpentOnDay)[0] ||
-        getWorklogStr(entities[task.parentId].created));
+        getWorklogStr(entities[task.parentId].doneOn || entities[task.parentId].created));
     return { [parentLogEntryDate]: 1 };
   } else {
-    return { [getWorklogStr(task.created)]: 1 };
+    return { [getWorklogStr(task.doneOn || task.created)]: 1 };
   }
 };
 
@@ -87,8 +88,8 @@ export const mapArchiveToWorklog = (
       }
 
       // TODO real types
-      const newItem: any = {
-        task,
+      const newItem: WorklogDataForDay = {
+        task: task,
         parentId: task.parentId,
         isNoRestore: noRestoreIds.includes(task.id),
         timeSpent: timeSpentOnDay[dateStr],

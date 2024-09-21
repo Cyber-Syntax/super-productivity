@@ -16,6 +16,9 @@ import { combineLatest, fromEvent, Observable, of } from 'rxjs';
 import { IS_FIREFOX } from '../../util/is-firefox';
 import { ImexMetaService } from '../../imex/imex-meta/imex-meta.service';
 import { IS_MOUSE_PRIMARY, IS_TOUCH_PRIMARY } from '../../util/is-mouse-primary';
+import { ChartConfiguration } from 'chart.js';
+import { IS_ANDROID_WEB_VIEW } from '../../util/is-android-web-view';
+import { androidInterface } from '../../features/android/android-interface';
 
 @Injectable({ providedIn: 'root' })
 export class GlobalThemeService {
@@ -60,7 +63,7 @@ export class GlobalThemeService {
   ) {}
 
   init(): void {
-    // This is here to make web page reloads on non work context pages at least usable
+    // This is here to make web page reloads on non-work-context pages at least usable
     this._setBackgroundGradient(true);
     this._initIcons();
     this._initHandlersForInitialBodyClasses();
@@ -116,6 +119,9 @@ export class GlobalThemeService {
       ['gitea', 'assets/icons/gitea.svg'],
       ['redmine', 'assets/icons/redmine.svg'],
       ['calendar', 'assets/icons/calendar.svg'],
+      ['early_on', 'assets/icons/early-on.svg'],
+      ['tomorrow', 'assets/icons/tomorrow.svg'],
+      ['next_week', 'assets/icons/next-week.svg'],
     ];
 
     icons.forEach(([name, path]) => {
@@ -160,6 +166,18 @@ export class GlobalThemeService {
       });
     }
 
+    if (IS_ANDROID_WEB_VIEW) {
+      androidInterface.isKeyboardShown$.subscribe((isShown) => {
+        console.log('isShown', isShown);
+
+        this.document.body.classList.remove(BodyClass.isAndroidKeyboardHidden);
+        this.document.body.classList.remove(BodyClass.isAndroidKeyboardShown);
+        this.document.body.classList.add(
+          isShown ? BodyClass.isAndroidKeyboardShown : BodyClass.isAndroidKeyboardHidden,
+        );
+      });
+    }
+
     this._globalConfigService.misc$.subscribe((misc) => {
       if (misc.isDisableAnimations) {
         this.document.body.classList.add(BodyClass.isDisableAnimations);
@@ -193,27 +211,34 @@ export class GlobalThemeService {
   }
 
   private _setChartTheme(isDarkTheme: boolean): void {
-    const overrides = isDarkTheme
+    const overrides: ChartConfiguration['options'] = isDarkTheme
       ? {
-          legend: {
-            labels: { fontColor: 'white' },
-          },
+          // legend: {
+          //   labels: { fontColor: 'white' },
+          // },
           scales: {
-            xAxes: [
-              {
-                ticks: { fontColor: 'white' },
-                gridLines: { color: 'rgba(255,255,255,0.1)' },
+            x: {
+              ticks: {
+                color: 'white',
               },
-            ],
-            yAxes: [
-              {
-                ticks: { fontColor: 'white' },
-                gridLines: { color: 'rgba(255,255,255,0.1)' },
+              grid: {
+                color: 'rgba(255,255,255,0.1)',
               },
-            ],
+            },
+
+            y: {
+              ticks: {
+                color: 'white',
+              },
+              grid: {
+                color: 'rgba(255,255,255,0.1)',
+              },
+            },
           },
         }
-      : {};
+      : {
+          scales: {},
+        };
     this._chartThemeService.setColorschemesOptions(overrides);
   }
 }

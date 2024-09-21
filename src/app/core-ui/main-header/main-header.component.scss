@@ -24,6 +24,9 @@ $macExtraPadding: (-8px + $mac-title-bar-padding);
     cursor: grabbing;
   }
 
+  .current-work-context-title,
+  ::ng-deep button,
+  ::ng-deep a,
   button,
   a {
     -webkit-app-region: no-drag;
@@ -102,7 +105,7 @@ button {
   }
 
   button {
-    margin-left: $s * 0.5;
+    margin-left: $s * 0.25;
 
     @include mq(xs) {
       margin-left: $s;
@@ -175,8 +178,8 @@ button {
       transform: rotate(-90deg);
       position: absolute;
       opacity: 0.15;
-      top: 0;
-      right: 0;
+      top: -8px;
+      right: -8px;
       pointer-events: none;
     }
 
@@ -383,6 +386,12 @@ simple-counter-button {
     @include darkTheme() {
       background: $dark-theme-bg-slightly-lighter;
       //border-color: $dark-theme-extra-border-color;
+    }
+  }
+
+  @include mq(xxxs, max) {
+    &:disabled {
+      display: none;
     }
   }
 }

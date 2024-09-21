@@ -4,7 +4,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
-  Input,
+  input,
   OnDestroy,
   OnInit,
   ViewChild,
@@ -24,7 +24,7 @@ import {
   timer,
   zip,
 } from 'rxjs';
-import { TaskPlanned, TaskWithSubTasks } from '../tasks/task.model';
+import { TaskWithSubTasks } from '../tasks/task.model';
 import { delay, filter, map, switchMap } from 'rxjs/operators';
 import { fadeAnimation } from '../../ui/animations/fade.ani';
 import { PlanningModeService } from '../planning-mode/planning-mode.service';
@@ -35,6 +35,8 @@ import { WorkContextService } from '../work-context/work-context.service';
 import { TaskRepeatCfgService } from '../task-repeat-cfg/task-repeat-cfg.service';
 import { TaskRepeatCfg } from '../task-repeat-cfg/task-repeat-cfg.model';
 import { ProjectService } from '../project/project.service';
+import { AddTasksForTomorrowService } from '../add-tasks-for-tomorrow/add-tasks-for-tomorrow.service';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 const SUB = 'SUB';
 const PARENT = 'PARENT';
@@ -52,10 +54,16 @@ const PARENT = 'PARENT';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkViewComponent implements OnInit, OnDestroy, AfterContentInit {
-  @Input() undoneTasks: TaskWithSubTasks[] = [];
-  @Input() doneTasks: TaskWithSubTasks[] = [];
-  @Input() backlogTasks: TaskWithSubTasks[] = [];
-  @Input() isShowBacklog: boolean = false;
+  // TODO refactor all to signals
+  undoneTasks = input<TaskWithSubTasks[]>([]);
+  doneTasks = input<TaskWithSubTasks[]>([]);
+  backlogTasks = input<TaskWithSubTasks[]>([]);
+  isShowBacklog = input<boolean>(false);
+
+  isPlanningMode = toSignal(this.planningModeService.isPlanningMode$);
+  todayRemainingInProject = toSignal(this.workContextService.todayRemainingInProject$);
+  estimateRemainingToday = toSignal(this.workContextService.estimateRemainingToday$);
+  workingToday = toSignal(this.workContextService.workingToday$);
 
   isShowTimeWorkedWithoutBreak: boolean = true;
   splitInputPos: number = 100;
@@ -81,7 +89,7 @@ export class WorkViewComponent implements OnInit, OnDestroy, AfterContentInit {
   // eslint-disable-next-line no-mixed-operators
   private _tomorrow: number = Date.now() + 24 * 60 * 60 * 1000;
   repeatableScheduledForTomorrow$: Observable<TaskRepeatCfg[]> =
-    this._taskRepeatCfgService.getRepeatTableTasksDueForDay$(this._tomorrow);
+    this._taskRepeatCfgService.getRepeatTableTasksDueForDayOnly$(this._tomorrow);
 
   private _subs: Subscription = new Subscription();
   private _switchListAnimationTimeout?: number;
@@ -98,6 +106,7 @@ export class WorkViewComponent implements OnInit, OnDestroy, AfterContentInit {
     private _activatedRoute: ActivatedRoute,
     private _projectService: ProjectService,
     private _cd: ChangeDetectorRef,
+    private _addTasksForTomorrowService: AddTasksForTomorrowService,
   ) {}
 
   @ViewChild('splitTopEl', { read: ElementRef }) set splitTopElRef(ref: ElementRef) {
@@ -178,19 +187,6 @@ export class WorkViewComponent implements OnInit, OnDestroy, AfterContentInit {
 
   startWork(): void {
     this.planningModeService.leavePlanningMode();
-  }
-
-  // NOTE: there is a duplicate of this in plan-tasks-tomorrow.component
-  addAllPlannedToDayAndCreateRepeatable(
-    plannedTasks: TaskPlanned[],
-    repeatableScheduledForTomorrow: TaskRepeatCfg[],
-  ): void {
-    this._taskRepeatCfgService.addAllPlannedToDayAndCreateRepeatable(
-      plannedTasks,
-      repeatableScheduledForTomorrow,
-      this.taskService.currentTaskId,
-      this._tomorrow,
-    );
   }
 
   resetBreakTimer(): void {

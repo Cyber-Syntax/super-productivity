@@ -1,10 +1,9 @@
 import { Inject, Injectable, LOCALE_ID } from '@angular/core';
-import { Actions, createEffect } from '@ngrx/effects';
+import { createEffect } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { selectCalendarProviders } from '../../config/store/global-config.reducer';
 import { distinctUntilChanged, first, map, switchMap, tap } from 'rxjs/operators';
 import { BehaviorSubject, EMPTY, forkJoin, timer } from 'rxjs';
-import { HttpClient } from '@angular/common/http';
 import { GlobalTrackingIntervalService } from '../../../core/global-tracking-interval/global-tracking-interval.service';
 import { BannerService } from '../../../core/banner/banner.service';
 import { DatePipe } from '@angular/common';
@@ -13,8 +12,6 @@ import { CalendarIntegrationEvent } from '../calendar-integration.model';
 import { TaskService } from '../../tasks/task.service';
 import { isCalenderEventDue } from '../is-calender-event-due';
 import { CalendarIntegrationService } from '../calendar-integration.service';
-import { LS } from '../../../core/persistence/storage-keys.const';
-import { getWorklogStr } from '../../../util/get-work-log-str';
 import { BannerId } from '../../../core/banner/banner.model';
 import { selectTaskByIssueId } from '../../tasks/store/task.selectors';
 import { NavigateToTaskService } from '../../../core-ui/navigate-to-task/navigate-to-task.service';
@@ -52,7 +49,7 @@ export class CalendarIntegrationEffects {
                 // timer(0, 10000).pipe(
                 tap(() => console.log('REQUEST CALENDAR', calProvider)),
                 switchMap(() =>
-                  this._calendarIntegrationService.requestEvents(calProvider),
+                  this._calendarIntegrationService.requestEvents$(calProvider),
                 ),
                 switchMap((allEventsToday) =>
                   timer(0, CHECK_TO_SHOW_INTERVAL).pipe(
@@ -61,7 +58,7 @@ export class CalendarIntegrationEffects {
                         isCalenderEventDue(
                           calEv,
                           calProvider,
-                          this._skippedEventIds,
+                          this._calendarIntegrationService.skippedEventIds$.getValue(),
                           now,
                         ),
                       );
@@ -85,22 +82,14 @@ export class CalendarIntegrationEffects {
     { id: string; calEv: CalendarIntegrationEvent; calProvider: CalendarProvider }[]
   >([]);
   showBanner = createEffect(
-    () =>
-      this._currentlyShownBanners$.pipe(
-        tap((v) => console.log('this._currentlyShownBanners$', v)),
-        tap((v) => this._showBanner(v)),
-      ),
+    () => this._currentlyShownBanners$.pipe(tap((v) => this._showBanner(v))),
     {
       dispatch: false,
     },
   );
 
-  private readonly _skippedEventIds: string[] = [];
-
   constructor(
-    private _actions$: Actions,
     private _store: Store,
-    private _http: HttpClient,
     private _globalTrackingIntervalService: GlobalTrackingIntervalService,
     private _bannerService: BannerService,
     private _datePipe: DatePipe,
@@ -108,17 +97,7 @@ export class CalendarIntegrationEffects {
     private _calendarIntegrationService: CalendarIntegrationService,
     private _navigateToTaskService: NavigateToTaskService,
     @Inject(LOCALE_ID) private locale: string,
-  ) {
-    if (localStorage.getItem(LS.CALENDER_EVENTS_LAST_SKIP_DAY) === getWorklogStr()) {
-      try {
-        const skippedEvIds = JSON.parse(
-          localStorage.getItem(LS.CALENDER_EVENTS_SKIPPED_TODAY) as string,
-        );
-        // TODO comment in after dev
-        this._skippedEventIds = skippedEvIds;
-      } catch (e) {}
-    }
-  }
+  ) {}
 
   private _addEvToShow(
     calEv: CalendarIntegrationEvent,
@@ -136,12 +115,7 @@ export class CalendarIntegrationEffects {
   }
 
   private _skipEv(evId: string): void {
-    this._skippedEventIds.push(evId);
-    localStorage.setItem(
-      LS.CALENDER_EVENTS_SKIPPED_TODAY,
-      JSON.stringify(this._skippedEventIds),
-    );
-    localStorage.setItem(LS.CALENDER_EVENTS_LAST_SKIP_DAY, getWorklogStr());
+    this._calendarIntegrationService.skipCalendarEvent(evId);
     this._currentlyShownBanners$.next(
       this._currentlyShownBanners$.getValue().filter((v) => v.id !== evId),
     );
@@ -155,7 +129,6 @@ export class CalendarIntegrationEffects {
     }[],
   ): Promise<void> {
     console.log('SHOW BANNER');
-
     const firstEntry = allEvsToShow[0];
     if (!firstEntry) {
       this._bannerService.dismiss(BannerId.CalendarEvent);
@@ -181,8 +154,8 @@ export class CalendarIntegrationEffects {
           ? T.F.CALENDARS.BANNER.TXT_PAST_MULTIPLE
           : T.F.CALENDARS.BANNER.TXT_PAST
         : nrOfAllBanners > 1
-        ? T.F.CALENDARS.BANNER.TXT_MULTIPLE
-        : T.F.CALENDARS.BANNER.TXT,
+          ? T.F.CALENDARS.BANNER.TXT_MULTIPLE
+          : T.F.CALENDARS.BANNER.TXT,
       translateParams: {
         title: calEv.title,
         start,

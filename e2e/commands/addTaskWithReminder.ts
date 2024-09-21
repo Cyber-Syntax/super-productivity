@@ -1,12 +1,11 @@
 import { AddTaskWithReminderParams, NBrowser } from '../n-browser-interface';
 
 const TASK = 'task';
-const SCHEDULE_TASK_ITEM = 'task-additional-info-item:nth-child(2)';
+const SCHEDULE_TASK_ITEM = 'task-detail-item:nth-child(2)';
 const DIALOG = 'mat-dialog-container';
-const DIALOG_SUBMIT = `${DIALOG} button[type=submit]:enabled`;
+const DIALOG_SUBMIT = `${DIALOG} mat-dialog-actions button:last-of-type`;
 
-const TIME_INP_H = 'owl-date-time-timer-box:first-of-type input';
-const TIME_INP_M = 'owl-date-time-timer-box:last-of-type input';
+const TIME_INP = 'input[type="time"]';
 
 const M = 60 * 1000;
 
@@ -26,28 +25,41 @@ module.exports = {
     }: AddTaskWithReminderParams,
   ) {
     const d = new Date(scheduleTime);
-    const h = d.getHours();
-    const m = d.getMinutes();
 
-    return (
-      this.addTask(title)
-        .openPanelForTask(taskSel)
-        .waitForElementVisible(SCHEDULE_TASK_ITEM)
-        .click(SCHEDULE_TASK_ITEM)
-        .waitForElementVisible(DIALOG)
-        .pause(30)
-        .waitForElementVisible(TIME_INP_H)
-        .pause(50)
-        .setValue(TIME_INP_H, h.toString())
-        .pause(50)
-        .setValue(TIME_INP_H, this.Keys.ARROW_RIGHT)
-        .pause(50)
-        .setValue(TIME_INP_M, m.toString())
-        // avoid element form being moved to backlog or away from today
-        .click('mat-checkbox')
-        .waitForElementVisible(DIALOG_SUBMIT)
-        .click(DIALOG_SUBMIT)
-        .waitForElementNotPresent(DIALOG)
-    );
+    return this.addTask(title)
+      .openPanelForTask(taskSel)
+      .waitForElementVisible(SCHEDULE_TASK_ITEM)
+      .click(SCHEDULE_TASK_ITEM)
+      .waitForElementVisible(DIALOG)
+      .pause(30)
+      .waitForElementVisible(TIME_INP)
+      .pause(50)
+      .setValue(TIME_INP, getTimeVal(d))
+      .pause(50)
+      .waitForElementVisible(DIALOG_SUBMIT)
+      .click(DIALOG_SUBMIT)
+      .waitForElementNotPresent(DIALOG);
   },
+};
+
+const getTimeVal = (d: Date): string => {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const v = new Date(d).toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: isBrowserLocaleClockType12h(),
+    timeZone: tz,
+  });
+  console.log(
+    `Enter time input value ${v}  – ${tz}; 12h: ${isBrowserLocaleClockType12h()}`,
+  );
+  return v;
+};
+
+const isBrowserLocaleClockType12h = (): boolean => {
+  const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+  const parts = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).formatToParts(
+    new Date(),
+  );
+  return parts.some((part) => part.type === 'dayPeriod');
 };

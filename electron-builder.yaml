@@ -1,5 +1,4 @@
 appId: superProductivity
-afterSign: electron-builder-notarize
 files:
   - electron/**/*
   - '!electron/**/*.ts'
@@ -41,21 +40,37 @@ linux:
     - rpm
   publish:
     - github
+# leads to Error: Please specify executable name as linux.executableName instead of linux.desktop.Exec
+#  desktop:
+#    Name: Super Productivity
+#    Comment: A todo list and time tracking app
+#    Exec: superProductivity
+#    Terminal: false
+#    Type: Application
+#    Icon: build/icon.png
+#    GenericName: ToDo List and Time Tracker
+
 snap:
   grade: stable
   allowNativeWayland: true
+  autoStart: true
+  base: core22
+  confinement: strict
 
 mac:
+  notarize: true
   appId: com.super-productivity.app
   type: distribution
   category: public.app-category.productivity
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  icon: build/icon.icns
+  icon: build/icon-mac.icns
   hardenedRuntime: true
   gatekeeperAssess: false
   provisioningProfile: embedded.provisionprofile
   darkModeSupport: true
+  extendInfo:
+    ITSAppUsesNonExemptEncryption: false
   publish:
     - github
   target:
@@ -64,9 +79,10 @@ mac:
       arch:
         - arm64
         - x64
+        - universal
 
 dmg:
-  sign: false
+  sign: true
   publish:
     - github
 

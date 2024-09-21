@@ -60,7 +60,7 @@ describe('TaskRepeatCfgService', () => {
         ]),
       );
 
-      const result = await service.getActionsForTaskRepeatCfg(taskRepeatCfg, null);
+      const result = await service.getActionsForTaskRepeatCfg(taskRepeatCfg);
 
       expect(result).toEqual([]);
     });
@@ -70,6 +70,10 @@ describe('TaskRepeatCfgService', () => {
       const taskRepeatCfg: TaskRepeatCfg = {
         id: TRID,
         tagIds: [],
+        startDate: 24 * 60 * 60 * 1000,
+        repeatEvery: 1,
+        repeatCycle: 'DAILY',
+        lastTaskCreation: 24,
       } as any;
       taskServiceMock.createNewTaskWithDefaults.and.callThrough();
       taskServiceMock.getTasksWithSubTasksByRepeatCfgId$.and.callFake(() =>
@@ -84,7 +88,7 @@ describe('TaskRepeatCfgService', () => {
         ]),
       );
 
-      const result = await service.getActionsForTaskRepeatCfg(taskRepeatCfg, null);
+      const result = await service.getActionsForTaskRepeatCfg(taskRepeatCfg);
 
       expect(result.length).toBeGreaterThan(0);
       expect(result[0].type).toEqual(addTask.type);

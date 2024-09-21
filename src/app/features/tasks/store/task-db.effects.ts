@@ -5,12 +5,14 @@ import {
   addTask,
   addTimeSpent,
   convertToMainTask,
-  deleteTasks,
   deleteTask,
+  deleteTasks,
   moveSubTask,
   moveSubTaskDown,
+  moveSubTaskToBottom,
+  moveSubTaskToTop,
   moveSubTaskUp,
-  moveToArchive,
+  moveToArchive_,
   moveToOtherProject,
   removeTagsForAllTasks,
   reScheduleTask,
@@ -24,8 +26,6 @@ import {
   updateTask,
   updateTaskTags,
   updateTaskUi,
-  moveSubTaskToTop,
-  moveSubTaskToBottom,
 } from './task.actions';
 import { select, Store } from '@ngrx/store';
 import { tap, withLatestFrom } from 'rxjs/operators';
@@ -39,6 +39,8 @@ import {
   deleteTaskAttachment,
   updateTaskAttachment,
 } from '../task-attachment/task-attachment.actions';
+import { PlannerActions } from '../../planner/store/planner.actions';
+import { deleteProject } from '../../project/store/project.actions';
 
 @Injectable()
 export class TaskDbEffects {
@@ -49,7 +51,6 @@ export class TaskDbEffects {
           addTask,
           restoreTask,
           addTimeSpent,
-          unScheduleTask,
           deleteTask,
           deleteTasks,
           undoDeleteTask,
@@ -65,7 +66,7 @@ export class TaskDbEffects {
           moveSubTaskDown,
           moveSubTaskToTop,
           moveSubTaskToBottom,
-          moveToArchive,
+          moveToArchive_,
           moveToOtherProject,
           toggleStart,
           roundTimeSpentForDay,
@@ -82,6 +83,14 @@ export class TaskDbEffects {
 
           // RELATED ACTIONS
           addTaskRepeatCfgToTask,
+
+          // PLANNER
+          PlannerActions.transferTask,
+          PlannerActions.moveBeforeTask,
+          PlannerActions.planTaskForDay,
+
+          // PROJECT
+          deleteProject,
         ),
         withLatestFrom(this._store$.pipe(select(selectTaskFeatureState))),
         tap(([, taskState]) => this._saveToLs(taskState, true)),

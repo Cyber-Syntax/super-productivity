@@ -29,6 +29,7 @@
   flex-grow: 1;
   position: relative;
   overflow: hidden;
+  -webkit-app-region: no-drag !important;
 
   > ::ng-deep router-outlet + * {
     position: absolute;
@@ -122,7 +123,7 @@ mat-sidenav {
   z-index: $z-side-nav;
 }
 @media (min-width: 800px) {
-  button.mat-menu-item {
+  button.mat-mdc-menu-item {
     width: 600px;
   }
 }

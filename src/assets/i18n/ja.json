@@ -1,4 +1,15 @@
 {
+  "ANDROID": {
+    "NOTIFICATIONS": {
+      "SYNC_CONFLICT_TITLE": "同期の競合が発生しました",
+      "SYNC_CONFLICT_MSG": "確認して何をするか決めてください。"
+    },
+    "PERMANENT_NOTIFICATION_MSGS": {
+      "INITIAL": "同期を有効にするためにバックグラウンドで実行されているアプリ",
+      "NO_ACTIVE_TASKS": "アクティブなタスクなし",
+      "SYNCING": "同期中"
+    }
+  },
   "APP": {
     "B_INSTALL": {
       "IGNORE": "無視する",
@@ -108,6 +119,19 @@
         "ISSUE_NOT_FOUND": "CalDav：Todo \"{{issueId}}\"がサーバー上で削除されているようです。"
       }
     },
+    "CALENDARS": {
+      "BANNER": {
+        "TXT": "<strong>{{title}}</strong>は<strong>{{start}}</strong>から始まります!",
+        "TXT_MULTIPLE": "<strong>{{title}}</strong>は<strong>{{start}}</strong>から始まります!<br> (および{{nrOfOtherBanners}} 件の他のイベントが予定されています)",
+        "TXT_PAST": "<strong>{{title}}</strong>が<strong>{{start}}</strong>に開始されました!",
+        "TXT_PAST_MULTIPLE": "<strong>{{title}}</strong>が<strong>{{start} }</strong>に開始されました!<br> (および{{nrOfOtherBanners}} 件の他のイベントが予定されています)",
+        "ADD_AS_TASK": "タスクとして追加",
+        "FOCUS_TASK": "フォーカスタスク"
+      },
+      "S": {
+        "CAL_PROVIDER_ERROR": "カレンダー プロバイダー エラー: {{errTxt}}"
+      }
+    },
     "CONFIG": {
       "S": {
         "UPDATE_SECTION": "<strong>{{sectionKey}}</strong>の設定を更新しました"
@@ -120,12 +144,81 @@
         "AUTH_ERROR": "Dropbox：提供された無効なアクセストークン",
         "AUTH_ERROR_ACTION": "トークンの変更",
         "OFFLINE": "Dropbox：オフラインのため、同期できません",
-        "SYNC_ERROR": "Dropbox：同期中のエラー"
+        "SYNC_ERROR": "Dropbox：同期中のエラー",
+        "UNABLE_TO_GENERATE_PKCE_CHALLENGE": "Dropbox: PKCE チャレンジを生成できません。"
       }
     },
     "FINISH_DAY_BEFORE_EXIT": {
       "C": {
         "FINISH_DAY_BEFORE_EXIT": "今日のリストには、まだアーカイブに移動されていない {{nr}} の完了したタスクがあります。あなたは本当にあなたの一日を終えることなくやめたいですか？"
+      }
+    },
+    "FOCUS_MODE": {
+      "BACK_TO_PLANNING": "計画に戻る",
+      "CANCEL_FOCUS_SESSION": "フォーカスセッションをキャンセル",
+      "CONGRATS": "セッションの完了おめでとうございます!",
+      "CONTINUE_FOCUS_SESSION": "フォーカスセッションを続ける",
+      "FINISH_TASK_AND_SELECT_NEXT": "タスクを終了して次を選択",
+      "GET_READY": "集中セッションの準備をしましょう!",
+      "GO_TO_PROCRASTINATION": "先延ばしにするときは助けを求める",
+      "NEXT": "次",
+      "ON": "オン",
+      "POMODORO_DISABLE": "ポモドーロを無効にする",
+      "POMODORO_INFO": "ポモドーロ タイマーが有効になっている場合、フォーカス セッションを併用することはできません。",
+      "PREP_STRETCH": "軽いストレッチをする",
+      "PREP_SIT_UPRIGHT": "まっすぐに座る(または立つ)",
+      "PREP_GET_MENTALLY_READY": "集中して生産的になるために精神的に準備する",
+      "SELECT_ANOTHER_TASK": "別のタスクを選択",
+      "SELECT_TASK": "集中するタスクを選択",
+      "SET_FOCUS_SESSION_DURATION": "フォーカスセッションの継続時間を設定する",
+      "SHOW_HIDE_NOTES_AND_ATTACHMENTS": "タスクのメモと添付ファイルを表示/非表示",
+      "START_FOCUS_SESSION": "フォーカスセッションを開始",
+      "START_NEXT_FOCUS_SESSION": "次のフォーカスセッションを開始",
+      "WORKED_FOR": "あなたが働いていたのは"
+    },
+    "GITEA": {
+      "DIALOG_INITIAL": {
+        "TITLE": "プロジェクト用にGiteaをセットアップする"
+      },
+      "FORM": {
+        "FILTER_USER": "ユーザー名 (例:自分で変更をフィルタリングする場合)",
+        "IS_AUTO_IMPORT_ISSUES": "Gitea から未解決の問題をバックログに自動的に追加する",
+        "IS_AUTO_POLL": "インポートされた Git のイシューの変更を自動的にポーリングします",
+        "IS_SEARCH_ISSUES_FROM_GITEA": "新しいタスクを追加するときに、git からのイシューを提案として表示する",
+        "HOST": "ホスト (例:https://try.gitea.io)",
+        "TOKEN": "アクセストークン",
+        "REPO_FULL_NAME": "ユーザー名または組織名/プロジェクト名",
+        "REPO_FULL_NAME_DESCRIPTION": "ブラウザでプロジェクトを表示するときに、URL の一部として見つかります。",
+        "SCOPE": "範囲",
+        "SCOPE_ALL": "全て",
+        "SCOPE_ASSIGNED": "私に割り当てられた",
+        "SCOPE_CREATED": "私が作った"
+      },
+      "FORM_SECTION": {
+        "TITLE": "Gitea"
+      },
+      "ISSUE_CONTENT": {
+        "MARK_AS_CHECKED": "更新をチェック済みとしてマーク"
+      }
+    },
+    "REDMINE": {
+      "FORM": {
+        "PROJECT_ID_DESCRIPTION": "ブラウザでプロジェクトを表示するときに、URL の一部として見つかります。",
+        "HOST": "ホスト (例: https://redmine.org)",
+        "API_KEY": "APIアクセスキー",
+        "SCOPE": "範囲",
+        "SCOPE_ALL": "全て",
+        "SCOPE_ASSIGNED": "私に割り当てられた",
+        "SCOPE_CREATED": "私が作った",
+        "IS_AUTO_POLL": "インポートされたRedmineのイシューの変更を自動的にポーリングします",
+        "IS_SEARCH_ISSUES_FROM_REDMINE": "新しいタスクを追加するときに、Redmine からのイシューを提案として表示する",
+        "IS_AUTO_IMPORT_ISSUES": "Redmineから未解決のイシューを自動的に追加する"
+      },
+      "FORM_SECTION": {
+        "TITLE": "Redmine"
+      },
+      "ISSUE_CONTENT": {
+        "MARK_AS_CHECKED": "更新をチェック済みとしてマーク"
       }
     },
     "GITHUB": {
@@ -197,26 +290,6 @@
       },
       "S": {
         "ERR_UNKNOWN": "GitLab：不明なエラー {{statusCode}} {{errorMsg}}"
-      }
-    },
-    "GOOGLE": {
-      "BANNER": {
-        "AUTH_FAIL": "GoogleApi：認証に失敗しましたもう一度ログインしてください。"
-      },
-      "DIALOG": {
-        "CREATE_SYNC_FILE": "Googleドライブ： <strong>\"{{fileName}}\"</strong> という名前のファイルが見つかりませんでした。 <strong>Googleドライブに同期ファイルとして</strong> を作成しますか？",
-        "USE_EXISTING_SYNC_FILE": "Googleドライブ：同期ファイルとして <strong>既存の</strong> ファイル <strong>\"{{fileName}}\"</strong> を使用しますか？そうでない場合は、同期ファイル名を変更してください。"
-      },
-      "S": {
-        "MULTIPLE_SYNC_FILES_WITH_SAME_NAME": "\"{{newFileName}}\"という名前のファイルが複数見つかりました。 1つを除いてすべて削除するか、別の名前を選択してください。",
-        "SYNC_FILE_CREATION_ERROR": "Googleドライブ：同期ファイル作成中にエラーが発生しました。 {{err}}",
-        "UPDATED_SYNC_FILE_NAME": "Googleドライブ：同期ファイル名を更新しました"
-      },
-      "S_API": {
-        "ERR": "GoogleApiエラー： {{errStr}}",
-        "ERR_NO_FILE_ID": "GoogleApi：ファイルIDが指定されていません",
-        "ERR_NO_FILE_NAME": "GoogleApi：ファイル名が指定されていません",
-        "SUCCESS_LOGIN": "GoogleApi：ログイン成功"
       }
     },
     "ISSUE": {
@@ -348,6 +421,7 @@
         "ON": "に",
         "STATUS": "状態",
         "STORY_POINTS": "ストーリーポイント",
+        "SUB_TASKS": "サブタスク",
         "SUMMARY": "概要",
         "WORKLOG": "作業記録",
         "WRITE_A_COMMENT": "コメントを書く"
@@ -425,7 +499,6 @@
       "D_ADD": {
         "NOTE_LABEL": "メモとして保存するテキストを入力してください..."
       },
-      "EDIT_FULLSCREEN": "全画面で編集する",
       "NOTES_CMP": {
         "ADD_BTN": "新しいメモを追加",
         "DROP_TO_ADD": "新しいメモを追加するには、ここにドロップしてください",
@@ -434,9 +507,16 @@
       "NOTE_CMP": {
         "DISABLE_PARSE": "マークダウン解析を無効にする",
         "ENABLE_PARSE": "マークダウン解析を有効にする"
-      }
+      },
+      "EDIT_FULLSCREEN": "全画面で編集する"
     },
     "OPEN_PROJECT": {
+      "CFG_CMP": {
+        "ALWAYS_ASK": "常にダイアログを開く",
+        "DONE": "タスク完了のステータス",
+        "DO_NOT": "移行しない",
+        "ENABLE": "Openproject統合を有効にする"
+      },
       "DIALOG_INITIAL": {
         "TITLE": "プロジェクト用にOpenProjectをセットアップする"
       },
@@ -655,12 +735,8 @@
           "L_ACCESS_TOKEN": "アクセストークン（認証コードから生成）"
         },
         "GOOGLE": {
-          "L_IS_COMPRESS_DATA": "データを圧縮する",
-          "L_SYNC_FILE_NAME": "同期ファイル名"
-        },
-        "LOCAL_FILE": {
-          "L_SYNC_FILE_PATH": "同期ファイルパス",
-          "L_SYNC_FILE_PATH_DESCRIPTION": "同期に使用する必要があるファイルへの絶対パス（作成されます）。"
+          "L_SYNC_FILE_NAME": "同期ファイル名",
+          "L_IS_COMPRESS_DATA": "データを圧縮する"
         },
         "L_ENABLE_SYNCING": "同期を有効にする",
         "L_SYNC_INTERVAL": "同期間隔",
@@ -670,8 +746,12 @@
           "CORS_INFO": "<strong>実験的!!</strong> これを機能させるには、NextcloudインスタンスのCORSを無効にするか制限する必要があります。これは、セキュリティに悪影響を与える可能性があります。詳細については、 <a href='https://github.com/nextcloud/server/issues/3131'>このスレッド</a> を参照してください。自己責任！",
           "L_BASE_URL": "ベースURL",
           "L_PASSWORD": "パスワード",
+          "L_USER_NAME": "ユーザー名",
+          "L_SYNC_FILE_PATH": "同期ファイルパス"
+        },
+        "LOCAL_FILE": {
           "L_SYNC_FILE_PATH": "同期ファイルパス",
-          "L_USER_NAME": "ユーザー名"
+          "L_SYNC_FILE_PATH_DESCRIPTION": "同期に使用する必要があるファイルへの絶対パス（作成されます）。"
         }
       },
       "S": {
@@ -746,7 +826,7 @@
         "CONVERT_TO_PARENT_TASK": "親タスクに変換",
         "DELETE": "タスクを削除",
         "DROP_ATTACHMENT": "ここにドロップして\"{{title}}\"に添付",
-        "EDIT_REMINDER": "リマインダーを編集",
+        "EDIT_SCHEDULED": "リマインダーを編集",
         "EDIT_TAGS": "タグを編集",
         "MARK_DONE": "完了としてマーク",
         "MARK_UNDONE": "未完了としてマーク",
@@ -760,7 +840,7 @@
         "REPEAT_EDIT": "繰り返しタスク設定の編集",
         "SCHEDULE": "タスクのスケジュール",
         "SHOW_UPDATES": "更新を表示",
-        "TOGGLE_ADDITIONAL": "追加情報を表示/非表示",
+        "TOGGLE_DETAIL_PANEL": "追加情報を表示/非表示",
         "TOGGLE_ATTACHMENTS": "添付ファイルの表示/非表示",
         "TOGGLE_DONE": "完了/未完了としてマーク",
         "TOGGLE_SUB_TASK_VISIBILITY": "サブタスクの表示/非表示",
@@ -768,11 +848,7 @@
         "TRACK_TIME_STOP": "タイムトラッキングを一時停止",
         "UPDATE_ISSUE_DATA": "課題データを更新"
       },
-      "D_REMINDER_ADD": {
-        "CONFIRM_REPEAT_OK": "スケジュール",
-        "CONFIRM_REPEAT_TXT": "この繰り返されるタスクを別の日にスケジュールしようとしています。繰り返されるタスクは通常、指定された日に再作成され、その日にのみスケジュールされることを意味します。とにかく続行しますか？",
-        "DATETIME_FOR": "リマインダーの日時",
-        "EDIT": "リマインダーを編集",
+      "D_SCHEDULE_TASK": {
         "MOVE_TO_BACKLOG": "スケジュールされるまでタスクをバックログに移動",
         "REMIND_AT": "で思い出させる",
         "RO_10M": "開始の10分前",
@@ -781,8 +857,13 @@
         "RO_30M": "開始の30分前",
         "RO_5M": "開始の5分前",
         "RO_START": "それが始まるとき",
+        "RO_NEVER": "Never",
         "SCHEDULE": "スケジュール",
-        "UNSCHEDULE": "予定外"
+        "UNSCHEDULE": "予定外",
+        "CONFIRM_REPEAT_OK": "スケジュール",
+        "CONFIRM_REPEAT_TXT": "この繰り返されるタスクを別の日にスケジュールしようとしています。繰り返されるタスクは通常、指定された日に再作成され、その日にのみスケジュールされることを意味します。とにかく続行しますか？",
+        "DATETIME_FOR": "リマインダーの日時",
+        "EDIT": "リマインダーを編集"
       },
       "D_REMINDER_VIEW": {
         "ADD_ALL_TO_TODAY": "今日にすべて追加",
@@ -874,21 +955,22 @@
         "WEDNESDAY": "水曜日"
       }
     },
-    "TIMELINE": {
+    "SCHEDULE": {
       "CONTINUED": "続く",
       "D_INITIAL": {
         "TEXT": "<p>タイムラインのアイデアは、計画されたタスクが時間の経過とともにどのように実行されるかをより正確に把握することです。これはタスクから自動的に生成され、2つの異なるものを区別します。計画された時間に表示される <strong>スケジュールされたタスク</strong>と、それらの固定イベントの周りを流れる <strong>通常のタスク</strong> です。すべてのタスクは、割り当てられた時間の見積もりを考慮します。</p><p>これに加えて、作業の開始時間と終了時間を指定することもできます。構成されている場合、通常のタスクはこれらの外に表示されることはありません。タイムラインには、今後30日間のみが含まれることに注意してください。</p>",
         "TITLE": "タイムライン"
       },
       "END": "作業終了",
-      "MENU_TITLE": "タイムライン",
       "NOW": "今",
       "NO_TASKS": "現在、タスクはありません。トップバーの+ボタンからいくつかのタスクを追加してください。",
+      "START": "作業開始",
+      "TASK_PROJECTION_INFO": "スケジュールされた反復可能なタスクの将来の予測",
+      "LUNCH_BREAK": "昼休憩",
+      "MENU_TITLE": "タイムライン",
       "S": {
         "CAL_PROVIDER_ERROR": "タイムライン校正プロバイダーエラー： {{errTxt}}"
-      },
-      "START": "作業開始",
-      "TASK_PROJECTION_INFO": "スケジュールされた反復可能なタスクの将来の予測"
+      }
     },
     "TIME_TRACKING": {
       "B": {
@@ -910,8 +992,8 @@
         "SIMPLE_COUNTER_TOOLTIP_DISABLE": "クリックして {{title}}を追跡しない",
         "SKIP": "スキップ",
         "TASK": "タスク",
-        "TASK_BREAK": "タスク+休憩",
-        "TRACK_TO": "以下に追加する："
+        "TRACK_TO": "以下に追加する：",
+        "TASK_BREAK": "タスク+休憩"
       },
       "D_TRACKING_REMINDER": {
         "CREATE_AND_TRACK": "<em>作成</em>して追加",
@@ -976,6 +1058,26 @@
         "NO_DATA": "今週はまだタスクがありません。",
         "TITLE": "タイトル"
       }
+    },
+    "GOOGLE": {
+      "BANNER": {
+        "AUTH_FAIL": "GoogleApi：認証に失敗しましたもう一度ログインしてください。"
+      },
+      "DIALOG": {
+        "CREATE_SYNC_FILE": "Googleドライブ： <strong>\"{{fileName}}\"</strong> という名前のファイルが見つかりませんでした。 <strong>Googleドライブに同期ファイルとして</strong> を作成しますか？",
+        "USE_EXISTING_SYNC_FILE": "Googleドライブ：同期ファイルとして <strong>既存の</strong> ファイル <strong>\"{{fileName}}\"</strong> を使用しますか？そうでない場合は、同期ファイル名を変更してください。"
+      },
+      "S": {
+        "MULTIPLE_SYNC_FILES_WITH_SAME_NAME": "\"{{newFileName}}\"という名前のファイルが複数見つかりました。 1つを除いてすべて削除するか、別の名前を選択してください。",
+        "SYNC_FILE_CREATION_ERROR": "Googleドライブ：同期ファイル作成中にエラーが発生しました。 {{err}}",
+        "UPDATED_SYNC_FILE_NAME": "Googleドライブ：同期ファイル名を更新しました"
+      },
+      "S_API": {
+        "ERR": "GoogleApiエラー： {{errStr}}",
+        "ERR_NO_FILE_ID": "GoogleApi：ファイルIDが指定されていません",
+        "ERR_NO_FILE_NAME": "GoogleApi：ファイル名が指定されていません",
+        "SUCCESS_LOGIN": "GoogleApi：ログイン成功"
+      }
     }
   },
   "FILE_IMEX": {
@@ -985,13 +1087,13 @@
   },
   "G": {
     "CANCEL": "キャンセル",
-    "CLICK_TO_EDIT": "クリックして編集する",
     "CLOSE": "閉じる",
     "DELETE": "削除",
     "DISMISS": "やめる",
     "DO_IT": "やれ！",
     "EDIT": "編集",
     "ENABLED": "有効",
+    "EXAMPLE_VAL": "クリックして編集する",
     "EXTENSION_INFO": "Jira ApiおよびIdle Time Handlingとの通信を可能にするために、<a target=\"_blank\" href=\"https://chrome.google.com/webstore/detail/super-productivity/ljkbjodfmekklcoibdnhahlaalhihmlb\">Chrome拡張機能をダウンロード</a>してください。これはモバイルでは機能しないことに注意してください。",
     "LOGIN": "ログイン",
     "LOGOUT": "ログアウト",
@@ -1025,9 +1127,9 @@
       "HELP": "<div><p>アイドル時間処理が有効になっていると、アイドル時間が経過したときに、どのタスクで時間を追跡するかを確認するために、指定した時間が経過した後にダイアログが開きます。</p></div>",
       "IS_ENABLE_IDLE_TIME_TRACKING": "アイドル時間処理を有効にする",
       "IS_ONLY_OPEN_IDLE_WHEN_CURRENT_TASK": "現在のタスクが選択されている場合にのみアイドル時間ダイアログを起動する",
-      "IS_UN_TRACKED_IDLE_RESETS_BREAK_TIMER": "追跡されていないアイドル時間のリセットは中断タイマーを取る",
       "MIN_IDLE_TIME": "アイドル状態になるまでの時間",
-      "TITLE": "アイドル処理"
+      "TITLE": "アイドル処理",
+      "IS_UN_TRACKED_IDLE_RESETS_BREAK_TIMER": "追跡されていないアイドル時間のリセットは中断タイマーを取る"
     },
     "IMEX": {
       "HELP": "<p>ここでは、すべてのデータをバックアップ用の <strong>JSON</strong> としてエクスポートできますが、それを別のコンテキストで使用することもできます（たとえば、プロジェクトをブラウザにエクスポートしてデスクトップバージョンにインポートできます） </p> <p>インポートは、有効なJSONがテキスト領域にコピーされることを期待しています。 <strong>注：インポートボタンを押すと、現在の設定とデータがすべて上書きされます。</strong></p>",
@@ -1047,7 +1149,7 @@
       "GO_TO_FOCUS_MODE": "フォーカスモードに移動",
       "GO_TO_SCHEDULED_VIEW": "スケジュールされたタスクに移動",
       "GO_TO_SETTINGS": "設定に移動",
-      "GO_TO_TIMELINE": "タイムラインに移動",
+      "GO_TO_SCHEDULE": "タイムラインに移動",
       "GO_TO_WORK_VIEW": "作業ビューに移動",
       "HELP": "<p>ここですべてのキーボードショートカットを設定できます。</p> <p>テキスト入力をクリックして、希望のキーボードの組み合わせを入力してください。保存するにはEnterキーを押し、中止するにはEscapeキーを押してください。</p> <p>3種類のショートカットがあります。</p> <ul> <li> <strong>グローバルショートカット：</strong> アプリが実行されているとき、他のすべてのアプリケーションからアクションが起動されます。 </li> <li> <strong>アプリケーションレベルのショートカット：</strong> アプリケーションのすべての画面から起動しますが、現在テキストフィールドを編集している場合はそうではありません。 </li> <li> <strong>タスクレベルのショートカット：</strong> マウスまたはキーボードでタスクを選択した場合にのみ起動され、通常そのタスクに関連したアクションを起動します。 </li> </ul>",
       "MOVE_TASK_DOWN": "リスト内のタスクを下に移動",
@@ -1060,6 +1162,7 @@
       "SHOW_SEARCH_BAR": "検索バーを表示する",
       "SYSTEM_SHORTCUTS": "グローバルショートカット（システム全体）",
       "TASK_ADD_SUB_TASK": "サブタスクを追加",
+      "TASK_ADD_ATTACHMENT": "ファイルまたはリンクを添付",
       "TASK_DELETE": "タスクを削除",
       "TASK_EDIT_TAGS": "タグを編集",
       "TASK_EDIT_TITLE": "タイトルを編集",
@@ -1069,7 +1172,7 @@
       "TASK_SCHEDULE": "スケジュールタスク",
       "TASK_SHORTCUTS": "タスク",
       "TASK_SHORTCUTS_INFO": "次のショートカットは、現在選択されているタスク（タブまたはマウスで選択）に適用されます。",
-      "TASK_TOGGLE_ADDITIONAL_INFO_OPEN": "追加の仕事情報を表示/隠す",
+      "TASK_TOGGLE_DETAIL_PANEL_OPEN": "追加の仕事情報を表示/隠す",
       "TASK_TOGGLE_DONE": "完了を切り替える",
       "TITLE": "キーボードショートカット",
       "TOGGLE_BACKLOG": "タスクバックログの表示/非表示",
@@ -1080,44 +1183,23 @@
       "ZOOM_IN": "ズームイン（デスクトップのみ）",
       "ZOOM_OUT": "ズームアウト（デスクトップのみ）"
     },
-    "LANG": {
-      "AR": "アラビア語",
-      "DE": "ドイツ語",
-      "EN": "英語",
-      "ES": "スペイン語",
-      "FA": "ペルシア語",
-      "FR": "フランス語",
-      "IT": "イタリア語",
-      "JA": "日本語",
-      "KO": "韓国語",
-      "LABEL": "言語を選択してください",
-      "NB": "ノルウェー語（ブークモール）",
-      "NL": "オランダ語",
-      "PL": "研磨",
-      "PT": "ポルトガル語",
-      "RU": "ロシア語",
-      "TITLE": "言語",
-      "TR": "トルコ語",
-      "ZH": "中国語（簡体）",
-      "ZH_TW": "中国語 (繁体字)"
-    },
     "MISC": {
       "DEFAULT_PROJECT": "何も指定されていない場合にタスクに使用するデフォルトのプロジェクト",
       "FIRST_DAY_OF_WEEK": "週の最初の日",
       "HELP": "<p><strong>デスクトップ通知が表示されませんか？</strong> Windowsの場合は、[システム]> [通知とアクション]を確認し、必要な通知が有効になっているかどうかを確認します。</p>",
       "IS_AUTO_ADD_WORKED_ON_TO_TODAY": "タスクに取り組むために今日タグを自動的に追加する",
       "IS_AUTO_MARK_PARENT_AS_DONE": "すべてのサブタスクが完了したら、親タスクを完了としてマークする",
-      "IS_AUTO_START_NEXT_TASK": "現在のタスクを完了したら、次のタスクの追跡を開始する",
       "IS_CONFIRM_BEFORE_EXIT": "アプリを終了する前に確認する",
       "IS_CONFIRM_BEFORE_EXIT_WITHOUT_FINISH_DAY": "最初に1日を終えずにアプリを終了する前に確認してください",
       "IS_DARK_MODE": "ダークモード",
       "IS_HIDE_NAV": "メインヘッダーが表示されるまでナビゲーションを非表示にする（デスクトップのみ）",
       "IS_MINIMIZE_TO_TRAY": "トレイに最小化（デスクトップのみ）",
-      "IS_NOTIFY_WHEN_TIME_ESTIMATE_EXCEEDED": "見積もり時間を超えたときに通知する",
       "IS_TRAY_SHOW_CURRENT_TASK": "トレイ/ステータスメニューに現在のタスクを表示する（デスクトップのみ）",
       "IS_TURN_OFF_MARKDOWN": "ノートのマークダウン解析をオフにする",
       "TASK_NOTES_TPL": "タスク記述テンプレート",
-      "TITLE": "その他の設定"
+      "TITLE": "その他の設定",
+      "IS_AUTO_START_NEXT_TASK": "現在のタスクを完了したら、次のタスクの追跡を開始する",
+      "IS_NOTIFY_WHEN_TIME_ESTIMATE_EXCEEDED": "見積もり時間を超えたときに通知する"
     },
     "POMODORO": {
       "BREAK_DURATION": "短い休憩時間",
@@ -1136,9 +1218,9 @@
     "SOUND": {
       "DONE_SOUND": "タスク完了音",
       "IS_INCREASE_DONE_PITCH": "実行するすべてのタスクのピッチを上げる",
-      "IS_PLAY_DONE_SOUND": "タスクが完了とマークされたときに音を鳴らす",
       "TITLE": "音",
-      "VOLUME": "ボリューム"
+      "VOLUME": "ボリューム",
+      "IS_PLAY_DONE_SOUND": "タスクが完了とマークされたときに音を鳴らす"
     },
     "TAKE_A_BREAK": {
       "HELP": "<div> <p>指定した時間休憩せずに作業したときに、繰り返し発生するリマインダーを設定できます。</p> <p>表示するメッセージは変更できます。 ${duration} は休憩せずに作業した時間に置き換えられます。</p> </div>",
@@ -1152,17 +1234,17 @@
       "SNOOZE_TIME": "休憩をとるように促されたときに時間をスヌーズする",
       "TITLE": "休憩リマインダー"
     },
-    "TIMELINE": {
-      "CAL_PROVIDERS": "カレンダープロバイダー（実験的およびオプション）",
-      "CAL_PROVIDERS_ADD": "icalソースを追加する",
-      "CAL_PROVIDERS_INFO": "オプションで、iCal（Googleカレンダーなど）からデータを読み込んで表示するようにタイムラインを構成できます。",
-      "HELP": "タイムライン機能は、計画されたタスクが時間の経過とともにどのように実行されるかについての簡単な概要を提供する必要があります。左側のメニューの <a href='#/timeline'>'タイムライン'</a>の下にあります。",
-      "L_CAL_PATH": "カレンダーICALのURL /ファイルパス（オプション）",
+    "SCHEDULE": {
+      "HELP": "タイムライン機能は、計画されたタスクが時間の経過とともにどのように実行されるかについての簡単な概要を提供する必要があります。左側のメニューの <a href='#/schedule'>'タイムライン'</a>の下にあります。",
       "L_IS_WORK_START_END_ENABLED": "予定外のタスクフローを特定の作業時間に制限する",
       "L_WORK_END": "就業日の終わり",
       "L_WORK_START": "就業日開始",
       "TITLE": "タイムライン",
-      "WORK_START_END_DESCRIPTION": "例えば17:00"
+      "WORK_START_END_DESCRIPTION": "例えば17:00",
+      "CAL_PROVIDERS": "カレンダープロバイダー（実験的およびオプション）",
+      "CAL_PROVIDERS_ADD": "icalソースを追加する",
+      "CAL_PROVIDERS_INFO": "オプションで、iCal（Googleカレンダーなど）からデータを読み込んで表示するようにタイムラインを構成できます。",
+      "L_CAL_PATH": "カレンダーICALのURL /ファイルパス（オプション）"
     },
     "TRACKING_REMINDER": {
       "HELP": "時間追跡の開始を忘れた場合に表示されるようにバナーを構成します。",
@@ -1188,13 +1270,13 @@
     "DBX_GEN_TOKEN": "Dropbox：トークンを生成...",
     "DBX_META": "Dropbox：ファイルメタを取得...",
     "DBX_UPLOAD": "Dropbox：ファイルをアップロード...",
-    "GDRIVE_DOWNLOAD": "Googleドライブ：ファイルをダウンロード...",
-    "GDRIVE_UPLOAD": "Googleドライブ：ファイルをアップロード...",
     "GITHUB_LOAD_ISSUE": "GitHub：課題データをロード...",
     "JIRA_LOAD_ISSUE": "Jira：課題データをロード...",
     "UNKNOWN": "リモートデータの読み込み",
     "WEB_DAV_DOWNLOAD": "WebDAV：データのダウンロード中...",
-    "WEB_DAV_UPLOAD": "WebDAV：データのアップロード中..."
+    "WEB_DAV_UPLOAD": "WebDAV：データのアップロード中...",
+    "GDRIVE_DOWNLOAD": "Googleドライブ：ファイルをダウンロード...",
+    "GDRIVE_UPLOAD": "Googleドライブ：ファイルをアップロード..."
   },
   "MH": {
     "ADD_NEW_TASK": "新しいタスクを追加する",
@@ -1202,7 +1284,6 @@
     "CREATE_TAG": "タグを作成",
     "DELETE_TAG": "タグを削除",
     "GO_TO_TASK_LIST": "タスクリストへ",
-    "MANAGE_PROJECTS": "プロジェクトを管理する",
     "METRICS": "メトリック",
     "NOTES": "ノート",
     "PROCRASTINATE": "先延ばし",
@@ -1210,7 +1291,6 @@
     "PROJECT_MENU": "プロジェクトメニュー",
     "PROJECT_SETTINGS": "プロジェクト設定",
     "QUICK_HISTORY": "クイックヒストリー",
-    "SCHEDULED": "予定",
     "SETTINGS": "設定",
     "SHOW_SEARCH_BAR": "検索バーを表示する",
     "TAGS": "タグ",
@@ -1220,7 +1300,9 @@
     "TOGGLE_SHOW_NOTES": "プロジェクトノートの表示/非表示",
     "TOGGLE_TRACK_TIME": "追跡時間の開始/停止",
     "TRIGGER_SYNC": "手動で同期をトリガーする",
-    "WORKLOG": "作業記録"
+    "WORKLOG": "作業記録",
+    "MANAGE_PROJECTS": "プロジェクトを管理する",
+    "SCHEDULED": "予定"
   },
   "PDS": {
     "BACK": "待って！何か忘れてる！",
@@ -1233,10 +1315,8 @@
       "OK": "アイアイ！シャットダウンします！"
     },
     "ESTIMATE_TOTAL": "合計見積もり：",
-    "EVALUATION": "評価",
     "EXPORT_TASK_LIST": "タスクリストのエクスポート",
     "NO_TASKS": "この日は何もしていません",
-    "PLAN": "計画",
     "ROUND_15M": "すべてのタスクを15分に丸める",
     "ROUND_30M": "すべてのタスクを30分に丸める",
     "ROUND_5M": "すべてのタスクを5分に丸める",
@@ -1250,43 +1330,16 @@
     "START_END": "開始 - 終了",
     "SUMMARY_FOR": " {{dayStr}}の日別サマリー",
     "TASKS_COMPLETED": "完了したタスク",
-    "TASK_LIST": "タスクリスト",
     "TIME_SPENT_AND_ESTIMATE_LABEL": "消費時間/推定時間",
     "TIME_SPENT_ESTIMATE_TITLE": "消費時間：今日消費した合計時間。アーカイブされたタスクは含まれていません。 - 推定時間：今日作業したタスクの見積もり時間から、他の日にすでに消費した時間を差し引いたもの。",
-    "TODAY": "今日",
-    "WEEK": "週間"
+    "WEEK": "週間",
+    "EVALUATION": "評価",
+    "PLAN": "計画",
+    "TASK_LIST": "タスクリスト",
+    "TODAY": "今日"
   },
   "PM": {
     "TITLE": "プロジェクトメトリクス"
-  },
-  "PP": {
-    "ARCHIVED_PROJECTS": "アーカイブプロジェクト",
-    "ARCHIVE_PROJECT": "アーカイブプロジェクト",
-    "CLICK_TO_HIDE": "メニューからプロジェクトを非表示にするにはクリックします",
-    "CLICK_TO_SHOW": "クリックしてプロジェクトをメニューに表示",
-    "DELETE_PROJECT": "プロジェクトを削除",
-    "D_CONFIRM_ARCHIVE": {
-      "MSG": "このプロジェクトをアーカイブしますか？アーカイブされたプロジェクトはメニューに表示されなくなり、復元しないとデータにアクセスできなくなります。これを行う前にデータをバックアップすることをお勧めします。",
-      "OK": "アーカイブ"
-    },
-    "D_CONFIRM_DELETE": {
-      "MSG": "このプロジェクトを削除してもよろしいですか？これを行う前にデータをバックアップすることをお勧めします。",
-      "OK": "削除"
-    },
-    "D_CONFIRM_UNARCHIVE": {
-      "MSG": "このプロジェクトをアーカイブ解除してよろしいですか？",
-      "OK": "アーカイブ解除"
-    },
-    "EDIT_PROJECT": "プロジェクトを編集",
-    "EXPORT_PROJECT": "プロジェクトをエクスポート",
-    "GITHUB_CONFIGURED": "GitHub連携を設定済み",
-    "GITLAB_CONFIGURED": "GitLab連携を設定済み",
-    "IMPORT_FROM_FILE": "ファイルからインポート",
-    "JIRA_CONFIGURED": "Jira連携が設定されました",
-    "OPEN_PROJECT_CONFIGURED": "OpenProject統合の構成",
-    "S_INVALID_JSON": "プロジェクトファイルのjsonが無効です",
-    "TITLE": "プロジェクト概要",
-    "UN_ARCHIVE_PROJECT": "アンアーカイブプロジェクト"
   },
   "PS": {
     "GLOBAL_SETTINGS": "全体設定",
@@ -1347,5 +1400,34 @@
     "TIME_ESTIMATED": "推定所要時間：",
     "WITHOUT_BREAK": "連続：",
     "WORKING_TODAY": "今日："
+  },
+  "PP": {
+    "ARCHIVED_PROJECTS": "アーカイブプロジェクト",
+    "ARCHIVE_PROJECT": "アーカイブプロジェクト",
+    "CLICK_TO_HIDE": "メニューからプロジェクトを非表示にするにはクリックします",
+    "CLICK_TO_SHOW": "クリックしてプロジェクトをメニューに表示",
+    "DELETE_PROJECT": "プロジェクトを削除",
+    "D_CONFIRM_ARCHIVE": {
+      "MSG": "このプロジェクトをアーカイブしますか？アーカイブされたプロジェクトはメニューに表示されなくなり、復元しないとデータにアクセスできなくなります。これを行う前にデータをバックアップすることをお勧めします。",
+      "OK": "アーカイブ"
+    },
+    "D_CONFIRM_DELETE": {
+      "MSG": "このプロジェクトを削除してもよろしいですか？これを行う前にデータをバックアップすることをお勧めします。",
+      "OK": "削除"
+    },
+    "D_CONFIRM_UNARCHIVE": {
+      "MSG": "このプロジェクトをアーカイブ解除してよろしいですか？",
+      "OK": "アーカイブ解除"
+    },
+    "EDIT_PROJECT": "プロジェクトを編集",
+    "EXPORT_PROJECT": "プロジェクトをエクスポート",
+    "GITHUB_CONFIGURED": "GitHub連携を設定済み",
+    "GITLAB_CONFIGURED": "GitLab連携を設定済み",
+    "IMPORT_FROM_FILE": "ファイルからインポート",
+    "JIRA_CONFIGURED": "Jira連携が設定されました",
+    "OPEN_PROJECT_CONFIGURED": "OpenProject統合の構成",
+    "S_INVALID_JSON": "プロジェクトファイルのjsonが無効です",
+    "TITLE": "プロジェクト概要",
+    "UN_ARCHIVE_PROJECT": "アンアーカイブプロジェクト"
   }
 }

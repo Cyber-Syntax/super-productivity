@@ -14,10 +14,10 @@ jobs:
     steps:
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       # required because setting via env.TZ does not work on windows
       - name: Set timezone to Europe Standard Time
-        uses: szenius/set-timezone@v1.2
+        uses: szenius/set-timezone@v2.0
         with:
           timezoneWindows: 'W. Europe Standard Time'
 
@@ -41,13 +41,16 @@ jobs:
         id: npm-cache-dir
         run: |
           echo "::set-output name=dir::$(npm config get cache)"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
+      - name: Workaround for nx issue
+        run: npm install @nx/nx-win32-x64-msvc
 
       - name: Install npm Packages
         #  if: steps.npm-cache.outputs.cache-hit != 'true'
@@ -63,7 +66,7 @@ jobs:
         run: npm run build
 
       - name: Build/Release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
+        uses: johannesjo/action-electron-builder@v1
         with:
           build_script_name: empty
           release: false
