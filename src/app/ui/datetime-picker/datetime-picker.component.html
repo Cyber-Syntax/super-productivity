@@ -61,6 +61,9 @@
   >
     <mat-label>{{ timeLabel() }}</mat-label>
     <mat-icon matPrefix>schedule</mat-icon>
+    <!-- 12h/24h here follows the browser/OS UI locale, not our dateTimeLocale
+         setting: browsers ignore `lang`, navigator.language and the ICU default
+         for native time inputs, so this cannot be forced from the page (#8565). -->
     <input
       type="time"
       spTimeStep
