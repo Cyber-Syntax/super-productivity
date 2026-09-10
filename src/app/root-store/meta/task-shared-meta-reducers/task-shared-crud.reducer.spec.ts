@@ -1269,6 +1269,105 @@ describe('taskSharedCrudMetaReducer', () => {
       );
     });
 
+    it('should remove a deleted subtask id from its parent subTaskIds and recalc its times', () => {
+      const testState = createStateWithExistingTasks(['parent1'], [], [], []);
+      const parent = createMockTask({
+        id: 'parent1',
+        projectId: 'project1',
+        subTaskIds: ['sub1', 'sub2'],
+        timeSpentOnDay: { '2026-09-08': 150 },
+        timeSpent: 150,
+        timeEstimate: 90,
+      });
+      const sub1 = createMockTask({
+        id: 'sub1',
+        projectId: 'project1',
+        parentId: 'parent1',
+        timeSpentOnDay: { '2026-09-08': 100 },
+        timeSpent: 100,
+        timeEstimate: 60,
+      });
+      const sub2 = createMockTask({
+        id: 'sub2',
+        projectId: 'project1',
+        parentId: 'parent1',
+        timeSpentOnDay: { '2026-09-08': 50 },
+        timeSpent: 50,
+        timeEstimate: 80,
+      });
+      testState[TASK_FEATURE_NAME] = {
+        ...testState[TASK_FEATURE_NAME],
+        ids: ['parent1', 'sub1', 'sub2'],
+        entities: { parent1: parent, sub1, sub2 },
+      };
+
+      const action = TaskSharedActions.deleteTasks({ taskIds: ['sub1'] });
+      metaReducer(testState, action);
+
+      const resultState = mockReducer.calls.mostRecent().args[0] as RootState;
+      expect(resultState[TASK_FEATURE_NAME].entities['sub1']).toBeUndefined();
+      expect(resultState[TASK_FEATURE_NAME].entities['sub2']).toBeDefined();
+      const resultParent = resultState[TASK_FEATURE_NAME].entities['parent1'];
+      expect(resultParent?.subTaskIds).toEqual(['sub2']);
+      expect(resultParent?.timeSpent).toBe(50);
+      expect(resultParent?.timeSpentOnDay).toEqual({ '2026-09-08': 50 });
+      // time left of the remaining subtask: 80 - 50
+      expect(resultParent?.timeEstimate).toBe(30);
+    });
+
+    it('should not touch a parent that is deleted in the same action', () => {
+      const testState = createStateWithExistingTasks(['parent1'], [], [], []);
+      const parent = createMockTask({
+        id: 'parent1',
+        projectId: 'project1',
+        subTaskIds: ['sub1'],
+      });
+      const sub1 = createMockTask({
+        id: 'sub1',
+        projectId: 'project1',
+        parentId: 'parent1',
+      });
+      testState[TASK_FEATURE_NAME] = {
+        ...testState[TASK_FEATURE_NAME],
+        ids: ['parent1', 'sub1'],
+        entities: { parent1: parent, sub1 },
+      };
+
+      const action = TaskSharedActions.deleteTasks({ taskIds: ['sub1', 'parent1'] });
+      metaReducer(testState, action);
+
+      const resultState = mockReducer.calls.mostRecent().args[0] as RootState;
+      expect(resultState[TASK_FEATURE_NAME].entities['parent1']).toBeUndefined();
+      expect(resultState[TASK_FEATURE_NAME].entities['sub1']).toBeUndefined();
+      expect(resultState[TASK_FEATURE_NAME].ids).toEqual([]);
+    });
+
+    it('should clear currentTaskId when the tracked subtask goes with its deleted parent', () => {
+      const testState = createStateWithExistingTasks(['parent1'], [], [], []);
+      const parent = createMockTask({
+        id: 'parent1',
+        projectId: 'project1',
+        subTaskIds: ['sub1'],
+      });
+      const sub1 = createMockTask({
+        id: 'sub1',
+        projectId: 'project1',
+        parentId: 'parent1',
+      });
+      testState[TASK_FEATURE_NAME] = {
+        ...testState[TASK_FEATURE_NAME],
+        ids: ['parent1', 'sub1'],
+        entities: { parent1: parent, sub1 },
+        currentTaskId: 'sub1',
+      };
+
+      const action = TaskSharedActions.deleteTasks({ taskIds: ['parent1'] });
+      metaReducer(testState, action);
+
+      const resultState = mockReducer.calls.mostRecent().args[0] as RootState;
+      expect(resultState[TASK_FEATURE_NAME].currentTaskId).toBeNull();
+    });
+
     it('should carry and apply iCal dismissals for deterministic remote replay', () => {
       const calendarTask = createMockTask({
         id: 'task1',

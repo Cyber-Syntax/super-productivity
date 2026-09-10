@@ -93,6 +93,8 @@
   --s: 8px;
   --s-quarter: 2px;
   --s-half: 4px;
+  // Glyph inside the done toggle and the multi-select ring that replaces it.
+  --done-toggle-glyph-size: 22px;
 
   // -----------------------------
   // Fonts
@@ -200,6 +202,7 @@
   --z-onboarding-presets: 999;
   --z-mobile-bottom-nav: 50;
   --z-right-panel: 44;
+  --z-multi-select-bar: 45;
   --z-right-panel-resize-handle: 65;
   --z-right-panel-edge-handle: 66;
   --z-vertical-action-bar: 70;

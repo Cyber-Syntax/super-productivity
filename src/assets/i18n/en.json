@@ -2017,6 +2017,73 @@
         "TINE_SPENT": "Time Spent",
         "TITLE": "Add for Day"
       },
+      "MULTI_SELECT": {
+        "ACTIONS": "Actions",
+        "CLEAR": "Clear selection",
+        "D_CONFIRM_DELETE": {
+          "MSG": {
+            "ONE": "Delete <strong>{{count}}</strong> task? Its subtasks are deleted too.",
+            "OTHER": "Delete <strong>{{count}}</strong> tasks? Subtasks are deleted too."
+          },
+          "OK": "Delete"
+        },
+        "S": {
+          "DEADLINE_REMOVED": {
+            "ONE": "Removed the deadline from {{count}} task",
+            "OTHER": "Removed the deadline from {{count}} tasks"
+          },
+          "DEADLINE_SET": {
+            "ONE": "Set the deadline of {{count}} task to {{date}}",
+            "OTHER": "Set the deadline of {{count}} tasks to {{date}}"
+          },
+          "DONE": {
+            "ONE": "Marked {{count}} task as done",
+            "OTHER": "Marked {{count}} tasks as done"
+          },
+          "ESTIMATE_CLEARED": {
+            "ONE": "Cleared the estimate of {{count}} task",
+            "OTHER": "Cleared the estimate of {{count}} tasks"
+          },
+          "ESTIMATE_SET": {
+            "ONE": "Estimated {{count}} task at {{estimate}}",
+            "OTHER": "Estimated {{count}} tasks at {{estimate}}"
+          },
+          "MOVED_TO_BACKLOG": {
+            "ONE": "Moved {{count}} task to the backlog",
+            "OTHER": "Moved {{count}} tasks to the backlog",
+            "PARTIAL": "Moved {{count}} of {{total}} tasks to the backlog (subtasks follow their parent)"
+          },
+          "MOVED_TO_PROJECT": {
+            "ONE": "Moved {{count}} task to \"{{projectTitle}}\"",
+            "OTHER": "Moved {{count}} tasks to \"{{projectTitle}}\"",
+            "PARTIAL": "Moved {{count}} of {{total}} tasks to \"{{projectTitle}}\" (subtasks follow their parent)"
+          },
+          "MOVED_TO_REGULAR": {
+            "ONE": "Moved {{count}} task to the regular list",
+            "OTHER": "Moved {{count}} tasks to the regular list",
+            "PARTIAL": "Moved {{count}} of {{total}} tasks to the regular list (subtasks follow their parent)"
+          },
+          "NOTHING_TO_DO": "Nothing to change for the selected tasks",
+          "SCHEDULED": {
+            "ONE": "Scheduled {{count}} task for {{date}}",
+            "OTHER": "Scheduled {{count}} tasks for {{date}}"
+          },
+          "UNDONE": {
+            "ONE": "Marked {{count}} task as not done",
+            "OTHER": "Marked {{count}} tasks as not done"
+          },
+          "UNSCHEDULED": {
+            "ONE": "Unscheduled {{count}} task",
+            "OTHER": "Unscheduled {{count}} tasks"
+          }
+        },
+        "SELECTED_COUNT": "{{count}} selected",
+        "SELECT_ENTRY": "Select several tasks…",
+        "TASKS_TITLE": {
+          "ONE": "{{count}} task",
+          "OTHER": "{{count}} tasks"
+        }
+      },
       "N": {
         "ESTIMATE_EXCEEDED": "Time estimate exceeded!",
         "ESTIMATE_EXCEEDED_BODY": "You exceeded your estimated time for \"{{title}}\"."
@@ -2634,6 +2701,7 @@
       "TASK_OPEN_NOTES_PANEL": "Open note/checklist in task panel",
       "TASK_OPEN_NOTES_FULLSCREEN": "Open note/checklist in fullscreen",
       "TASK_TOGGLE_DONE": "Toggle task completed status",
+      "TASK_TOGGLE_SELECT": "Toggle task in multi-selection",
       "TASK_UNSCHEDULE": "Unschedule task",
       "TITLE": "Keyboard Shortcuts",
       "TOGGLE_BACKLOG": "Show/hide project backlog",

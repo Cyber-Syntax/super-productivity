@@ -7,8 +7,11 @@ import { Log } from '../../core/log';
 import { TaskComponent } from './task/task.component';
 import { TaskContextMenuComponent } from './task-context-menu/task-context-menu.component';
 import { TaskContextMenuInnerComponent } from './task-context-menu/task-context-menu-inner/task-context-menu-inner.component';
+import { KeyboardConfig } from '@sp/keyboard-config';
 import { isInputElement } from '../../util/dom-element';
 import { getDomFocusedTaskId } from './get-dom-focused-task-id';
+import { TaskMultiSelectService } from './task-multi-select.service';
+import { TaskBulkActionService } from './task-bulk-action.service';
 import { taskToMarkdownChecklist } from './task-to-markdown-checklist';
 
 type TaskId = string;
@@ -48,6 +51,8 @@ export class TaskShortcutService {
   private readonly _taskFocusService = inject(TaskFocusService);
   private readonly _taskService = inject(TaskService);
   private readonly _configService = inject(GlobalConfigService);
+  private readonly _multiSelect = inject(TaskMultiSelectService);
+  private readonly _bulkActions = inject(TaskBulkActionService);
   readonly isTimeTrackingEnabled = computed(
     () => this._configService.appFeatures().isTimeTrackingEnabled,
   );
@@ -64,6 +69,15 @@ export class TaskShortcutService {
 
     const keys = cfg.keyboard;
     const focusedTaskId: TaskId | null = getDomFocusedTaskId();
+
+    // Multi-selection: Esc clears; Shift+Arrow extends from the focused row;
+    // the bulk-capable task shortcuts act on the whole selection. These run
+    // before the focused-task gate so they also work when focus sits on the
+    // selection bar or a dialog just closed. (ShortcutService already bails
+    // out for inputs and open overlays, so Esc/typing there are untouched.)
+    if (this._handleMultiSelectShortcuts(ev, keys, focusedTaskId)) {
+      return true;
+    }
 
     // Schedule for today (Shift+T). This is the one task shortcut wired to work
     // without a live <task> component, so it also fires from views that render
@@ -325,6 +339,158 @@ export class TaskShortcutService {
     }
 
     return false;
+  }
+
+  private _handleMultiSelectShortcuts(
+    ev: KeyboardEvent,
+    keys: KeyboardConfig,
+    focusedTaskId: TaskId | null,
+  ): boolean {
+    // Selection keys act on the focused main-list row only; detail-panel copies
+    // are never part of the selection (see TaskMultiSelectService.focusedRowId).
+    const selectableRowId = this._multiSelect.focusedRowId();
+
+    if (ev.key === 'Escape' && this._multiSelect.isSelecting()) {
+      this._multiSelect.clear();
+      ev.preventDefault();
+      return true;
+    }
+
+    if (
+      selectableRowId &&
+      ev.shiftKey &&
+      !ev.ctrlKey &&
+      !ev.metaKey &&
+      !ev.altKey &&
+      (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') &&
+      // A user who bound a task shortcut to Shift+Arrow keeps it.
+      !checkKeyCombo(ev, keys.moveTaskUp) &&
+      !checkKeyCombo(ev, keys.moveTaskDown)
+    ) {
+      this._extendSelectionThrottled(ev.key === 'ArrowDown' ? 'down' : 'up');
+      ev.preventDefault();
+      return true;
+    }
+
+    // `X` toggles the focused row in the selection (Linear / Gmail convention).
+    // A user or plugin binding on the same combo keeps precedence.
+    if (
+      selectableRowId &&
+      !ev.repeat &&
+      checkKeyCombo(ev, keys.taskToggleSelect) &&
+      !this._isAnyConfiguredCombo(ev, { ...keys, taskToggleSelect: null })
+    ) {
+      this._multiSelect.toggle(selectableRowId);
+      ev.preventDefault();
+      return true;
+    }
+
+    // Ctrl/Cmd+A on a focused row selects every row of its list. Goes through
+    // checkKeyCombo so the user's keyboard-layout map applies. The global
+    // handler lets Cmd+key through from inputs, so guard against a title edit.
+    if (
+      selectableRowId &&
+      (checkKeyCombo(ev, 'Ctrl+A') || checkKeyCombo(ev, 'Meta+A')) &&
+      !(ev.target instanceof HTMLElement && isInputElement(ev.target)) &&
+      // A user who bound a shortcut to Ctrl/Cmd+A keeps it.
+      !this._isAnyConfiguredCombo(ev, keys)
+    ) {
+      this._multiSelect.selectAllInListOfFocused();
+      ev.preventDefault();
+      return true;
+    }
+
+    if (!this._multiSelect.isActive()) {
+      return false;
+    }
+
+    // A shortcut on a focused row that is *not* part of the selection acts on
+    // that row alone (file-manager rule): drop the selection and fall through.
+    if (focusedTaskId && !this._multiSelect.has(focusedTaskId)) {
+      if (this._isBulkShortcut(ev, keys)) {
+        this._multiSelect.clear();
+      }
+      return false;
+    }
+
+    // Bulk allowlist. Everything else keeps acting on the focused task only.
+    const bulkHandlers: [string | null | undefined, () => unknown][] = [
+      [keys.taskToggleDone, () => this._bulkActions.toggleDone()],
+      [keys.taskDelete, () => this._bulkActions.deleteSelected()],
+      [keys.taskSchedule, () => this._bulkActions.openScheduleDialog()],
+      [keys.taskScheduleDeadline, () => this._bulkActions.openDeadlineDialog()],
+      [keys.taskScheduleToday, () => this._bulkActions.addToToday()],
+      [keys.taskUnschedule, () => this._bulkActions.unschedule()],
+      [keys.moveToBacklog, () => this._bulkActions.moveToBacklog()],
+      [keys.taskMoveToProject, () => this._requestBulkMenu(focusedTaskId)],
+      [keys.taskEditTags, () => this._requestBulkMenu(focusedTaskId)],
+      [keys.taskOpenEstimationDialog, () => this._requestBulkMenu(focusedTaskId)],
+      [keys.taskOpenContextMenu, () => this._requestBulkMenu(focusedTaskId)],
+    ];
+    for (const [combo, handler] of bulkHandlers) {
+      if (combo && checkKeyCombo(ev, combo)) {
+        handler();
+        ev.preventDefault();
+        ev.stopPropagation();
+        return true;
+      }
+    }
+    if (isNativeContextMenuKey(ev)) {
+      this._requestBulkMenu(focusedTaskId);
+      ev.preventDefault();
+      return true;
+    }
+    return false;
+  }
+
+  /** True when any configured combo (task, global or plugin) matches `ev`. */
+  private _isAnyConfiguredCombo(ev: KeyboardEvent, keys: KeyboardConfig): boolean {
+    return Object.values(keys).some(
+      (combo) => typeof combo === 'string' && !!combo && checkKeyCombo(ev, combo),
+    );
+  }
+
+  private _isBulkShortcut(ev: KeyboardEvent, keys: KeyboardConfig): boolean {
+    return (
+      [
+        keys.taskToggleDone,
+        keys.taskDelete,
+        keys.taskSchedule,
+        keys.taskScheduleDeadline,
+        keys.taskScheduleToday,
+        keys.taskUnschedule,
+        keys.moveToBacklog,
+        keys.taskMoveToProject,
+        keys.taskEditTags,
+        keys.taskOpenEstimationDialog,
+        keys.taskOpenContextMenu,
+      ].some((combo) => !!combo && checkKeyCombo(ev, combo)) || isNativeContextMenuKey(ev)
+    );
+  }
+
+  private _lastExtendAt = 0;
+
+  /** Key repeat over a long list would re-check every row per event; ~30/s → 10/s. */
+  private _extendSelectionThrottled(direction: 'up' | 'down'): void {
+    const now = Date.now();
+    if (now - this._lastExtendAt < 100) {
+      return;
+    }
+    this._lastExtendAt = now;
+    this._multiSelect.extendFromFocused(direction);
+  }
+
+  /** Opens the bulk actions menu next to the focused row (or the bar). */
+  private _requestBulkMenu(focusedTaskId: TaskId | null): void {
+    const rowEl = focusedTaskId
+      ? (document.activeElement?.closest('task') as HTMLElement | null)
+      : null;
+    const rect = rowEl?.getBoundingClientRect();
+    this._multiSelect.requestMenuOpen(
+      rect
+        ? { x: rect.left + Math.min(rect.width / 2, 200), y: rect.bottom }
+        : { x: window.innerWidth / 2, y: window.innerHeight - 80 },
+    );
   }
 
   /**
