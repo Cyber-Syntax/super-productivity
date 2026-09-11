@@ -357,4 +357,37 @@ describe('DateTimePickerComponent', () => {
     fixture.detectChanges();
     expect(component.isKeyboardNavigating).toBeTrue();
   });
+  describe('quick access', () => {
+    const getQuickAccessBtns = (): HTMLButtonElement[] =>
+      Array.from(fixture.nativeElement.querySelectorAll('.quick-access button'));
+
+    // No translations are loaded in the test bed, so the pipe echoes the key —
+    // which makes these assertions pin the exact keys, not just "some text".
+    it('should render each shortcut with its label as the visible text', () => {
+      fixture.detectChanges();
+      const labels = getQuickAccessBtns().map((btn) =>
+        btn.querySelector('.quick-access-label')?.textContent?.trim(),
+      );
+
+      expect(labels).toEqual(['G.TODAY', 'G.TOMORROW', 'G.NEXT_WEEK', 'G.NEXT_MONTH']);
+    });
+
+    it('should not set an aria-label that could diverge from the visible label', () => {
+      fixture.detectChanges();
+
+      getQuickAccessBtns().forEach((btn) => {
+        expect(btn.getAttribute('aria-label')).toBeNull();
+      });
+    });
+
+    it('should emit the shortcut id on click', () => {
+      fixture.detectChanges();
+      const emitted: string[] = [];
+      component.quickAccessClick.subscribe((v) => emitted.push(v));
+
+      getQuickAccessBtns().forEach((btn) => btn.click());
+
+      expect(emitted).toEqual(['today', 'tomorrow', 'nextWeek', 'nextMonth']);
+    });
+  });
 });

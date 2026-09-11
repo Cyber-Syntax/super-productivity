@@ -15,7 +15,6 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatCalendar, MatCalendarView } from '@angular/material/datepicker';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import {
   MatFormField,
@@ -26,7 +25,6 @@ import {
 import { MatInput } from '@angular/material/input';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
-import { MatTooltip } from '@angular/material/tooltip';
 import { TranslateModule, TranslatePipe } from '@ngx-translate/core';
 import { T } from '../../t.const';
 import { DateService } from '../../core/date/date.service';
@@ -44,13 +42,27 @@ import { IS_ELECTRON_TOKEN } from '../../app.constants';
 
 const DEFAULT_TIME = '09:00';
 
+export type QuickAccessId = 'today' | 'tomorrow' | 'nextWeek' | 'nextMonth';
+
+/**
+ * Quick access shortcuts, rendered as icon + visible label. The label doubles as
+ * the accessible name — an aria-label with richer wording ("Schedule next week")
+ * would diverge from the visible text in every locale that translates one string
+ * and falls back to English for the other, failing WCAG 2.5.3 (Label in Name).
+ */
+const QUICK_ACCESS_ITEMS = [
+  { id: 'today', icon: 'wb_sunny', label: T.G.TODAY },
+  { id: 'tomorrow', icon: 'wb_twilight', label: T.G.TOMORROW },
+  { id: 'nextWeek', icon: 'next_week', label: T.G.NEXT_WEEK },
+  { id: 'nextMonth', icon: 'bedtime', label: T.G.NEXT_MONTH },
+] as const satisfies readonly { id: QuickAccessId; icon: string; label: string }[];
+
 @Component({
   selector: 'datetime-picker',
   standalone: true,
   imports: [
     FormsModule,
     MatCalendar,
-    MatButtonModule,
     MatIcon,
     MatFormField,
     MatLabel,
@@ -59,7 +71,6 @@ const DEFAULT_TIME = '09:00';
     MatInput,
     MatSelect,
     MatOption,
-    MatTooltip,
     TranslateModule,
     TranslatePipe,
     TimeStepDirective,
@@ -85,17 +96,17 @@ export class DateTimePickerComponent implements AfterViewInit {
   timeLabel = input<string>('Time');
   reminderLabel = input<string>(T.F.TASK.D_SCHEDULE_TASK.REMIND_AT);
   showQuickAccess = input<boolean>(true);
-  quickAccessTranslationPrefix = input<string>('F.TASK.D_SCHEDULE_TASK');
 
   // Outputs
   dateSelected = output<Date>();
   timeChanged = output<string | null>();
   reminderChanged = output<TaskReminderOptionId>();
-  quickAccessClick = output<'today' | 'tomorrow' | 'nextWeek' | 'nextMonth'>();
+  quickAccessClick = output<QuickAccessId>();
   enterSubmit = output<void>();
 
   // Template variables
   T: typeof T = T;
+  quickAccessItems = QUICK_ACCESS_ITEMS;
   isInitValOnTimeFocus = true;
   isShowEnterMsg = false;
   @HostBinding('class.sp-hide-cursor') isKeyboardNavigating = false;
@@ -261,10 +272,7 @@ export class DateTimePickerComponent implements AfterViewInit {
     this._timeCheckVal = null;
   }
 
-  quickAccessBtnClick(
-    ev: MouseEvent,
-    val: 'today' | 'tomorrow' | 'nextWeek' | 'nextMonth',
-  ): void {
+  quickAccessBtnClick(ev: MouseEvent, val: QuickAccessId): void {
     ev.preventDefault();
     this.quickAccessClick.emit(val);
   }
