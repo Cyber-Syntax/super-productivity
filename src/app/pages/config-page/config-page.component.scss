@@ -64,12 +64,7 @@
       margin-bottom: var(--s2);
     }
 
-    ::ng-deep .mat-mdc-tab-labels {
-      justify-content: flex-start;
-    }
-
     ::ng-deep .mat-mdc-tab {
-      flex-grow: 0 !important;
       min-width: 120px;
       border-radius: var(--card-border-radius) var(--card-border-radius) 0 0;
       transition: background-color var(--transition-fast);
