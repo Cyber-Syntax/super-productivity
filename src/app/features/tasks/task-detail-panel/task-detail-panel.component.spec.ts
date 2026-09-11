@@ -60,8 +60,13 @@ describe('TaskDetailPanelComponent', () => {
     });
     const mockGlobalConfigService = jasmine.createSpyObj('GlobalConfigService', [], {
       cfg: jasmine.createSpy().and.returnValue({ keyboard: {} }),
-      tasks: jasmine.createSpy().and.returnValue({}),
+      // Formatting off keeps these specs on the plain-textarea notes path; the
+      // live markdown editor (#9910) has its own specs and an e2e.
+      tasks: jasmine
+        .createSpy()
+        .and.returnValue({ isMarkdownFormattingInNotesEnabled: false }),
       clipboardImages: jasmine.createSpy().and.returnValue(null),
+      misc: jasmine.createSpy().and.returnValue({}),
     });
     const mockIssueService = jasmine.createSpyObj(
       'IssueService',
@@ -419,7 +424,14 @@ describe('TaskDetailPanelComponent stale-focus guard', () => {
         { provide: TaskAttachmentService, useValue: {} },
         { provide: ClipboardImageService, useValue: {} },
         { provide: LayoutService, useValue: { isXs: () => false } },
-        { provide: GlobalConfigService, useValue: { cfg: () => ({}) } },
+        {
+          provide: GlobalConfigService,
+          useValue: {
+            cfg: () => ({}),
+            misc: () => ({}),
+            tasks: () => ({ isMarkdownFormattingInNotesEnabled: false }),
+          },
+        },
         { provide: IssueService, useValue: { getById$: () => of(null) } },
         {
           provide: TaskRepeatCfgService,
@@ -505,9 +517,11 @@ describe('TaskDetailPanelComponent stale-focus guard', () => {
 });
 
 // Opening the notes panel via a checklist's progress badge routes through
-// TaskDetailTargetPanel.Notes. It must land on the RENDERED checklist (preview),
-// not auto-open the raw-markdown editor: doing both briefly flashed the raw
-// "- [ ] " source before focusItem() blurred the editor back to preview.
+// TaskDetailTargetPanel.Notes. It must not auto-focus the notes editor: doing
+// both briefly flashed the raw "- [ ] " source before focusItem() blurred it
+// back. (These specs run the markdown-formatting-off path, so "not focused"
+// means the preview stays up; on the default path it means the live editor
+// keeps its syntax hidden.)
 describe('TaskDetailPanelComponent notes target does not auto-edit', () => {
   let component: TaskDetailPanelComponent;
   let fixture: ComponentFixture<TaskDetailPanelComponent>;
@@ -535,7 +549,14 @@ describe('TaskDetailPanelComponent notes target does not auto-edit', () => {
         { provide: TaskAttachmentService, useValue: {} },
         { provide: ClipboardImageService, useValue: {} },
         { provide: LayoutService, useValue: { isXs: () => false } },
-        { provide: GlobalConfigService, useValue: { cfg: () => ({}) } },
+        {
+          provide: GlobalConfigService,
+          useValue: {
+            cfg: () => ({}),
+            misc: () => ({}),
+            tasks: () => ({ isMarkdownFormattingInNotesEnabled: false }),
+          },
+        },
         { provide: IssueService, useValue: { getById$: () => of(null) } },
         {
           provide: TaskRepeatCfgService,
@@ -634,7 +655,11 @@ describe('TaskDetailPanelComponent add sub-task', () => {
         { provide: LayoutService, useValue: { isXs: () => false } },
         {
           provide: GlobalConfigService,
-          useValue: { cfg: () => ({ keyboard: { taskAddSubTask: 'a' } }) },
+          useValue: {
+            cfg: () => ({ keyboard: { taskAddSubTask: 'a' } }),
+            misc: () => ({}),
+            tasks: () => ({ isMarkdownFormattingInNotesEnabled: false }),
+          },
         },
         { provide: IssueService, useValue: { getById$: () => of(null) } },
         {
