@@ -1,0 +1,2 @@
+Fixed Escape not properly leaving the plain-text notes field.
+Fixed task details stealing focus back from a field you re-entered.
