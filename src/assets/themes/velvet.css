@@ -169,6 +169,14 @@ body.isDarkTheme {
   /* Generous radii — Raycast feel */
   --card-border-radius: 10px;
   --task-border-radius: 8px;
+  /* Boxed rows: the app default is flat hairline rows, so opt back into
+     the card layout (border, gap, no separator/leading edge/hover tint). */
+  --task-border: 1px solid var(--task-border-color);
+  --task-separator: none;
+  --task-row-edge: var(--task-border);
+  --task-selected-edge: none;
+  --task-hover-bg: transparent;
+  --task-list-row-gap: var(--s-half);
   --radius-md: 10px;
   --radius-lg: 14px;
 

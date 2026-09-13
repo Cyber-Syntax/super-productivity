@@ -1,7 +1,7 @@
 @let cfg = cfg$ | async;
 
 <div class="page-wrapper">
-  <h1 class="done-headline mat-headline-5">
+  <h1 class="done-headline">
     @if (isForToday && !cfg?.misc?.isDisableCelebration) {
       <span [innerHTML]="T.PDS.CELEBRATE | translate"></span>
     } @else {

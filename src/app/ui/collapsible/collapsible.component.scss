@@ -6,6 +6,26 @@
   padding: calc(var(--s) / 2) var(--s);
 }
 
+// Task-list section headings share one treatment, including user-made sections.
+:host(.task-section) .collapsible-header {
+  min-height: var(--bar-height);
+  padding: 0 var(--s);
+  gap: var(--s-half);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  text-align: start;
+  border-bottom: 1px solid transparent;
+
+  .collapsible-expand-icon {
+    margin-right: 0;
+    color: var(--text-color-muted);
+  }
+}
+
+:host(.task-section.isExpanded) .collapsible-header {
+  border-bottom-color: var(--divider-color);
+}
+
 .collapsible-header {
   &:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring-color);

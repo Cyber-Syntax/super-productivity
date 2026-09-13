@@ -59,6 +59,13 @@
   }
 }
 
+// The global placeholder opacity (0.1) is too faint between hairline rows;
+// a stronger ghost plus an accent top line marks the drop slot.
+.cdk-drag-placeholder {
+  opacity: 0.3;
+  border-top: 2px solid var(--c-accent);
+}
+
 .cdk-drag-placeholder,
 .cdk-drag-preview {
   border-radius: var(--task-border-radius);

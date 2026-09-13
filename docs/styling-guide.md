@@ -157,6 +157,27 @@ Dark elevation colors: `--dark0` (rgb(0,0,0)) through `--dark24` (rgb(56,56,56))
 
 Mixins are in `src/styles/mixins/_theming.scss`.
 
+## Task rows (flat vs boxed)
+
+Tasks, planner and board rows, and issue-panel items are flat, hairline-separated
+rows by default. The boxed look lives in the `classic` theme and is token-only, so
+every switch must stay token-driven — never hardcode a border or surface on a row:
+
+| Token                  | Default                            | Classic                              |
+| ---------------------- | ---------------------------------- | ------------------------------------ |
+| `--task-border`        | `none`                             | `1px solid var(--task-border-color)` |
+| `--task-separator`     | `1px solid var(--separator-color)` | `none`                               |
+| `--task-row-edge`      | `var(--task-separator)`            | `var(--task-border)`                 |
+| `--task-selected-edge` | 3px leading bar                    | `none` (surface + shadow instead)    |
+| `--task-hover-bg`      | `var(--state-hover)`               | `transparent`                        |
+| `--task-border-radius` | `0`                                | `var(--radius-sm)`                   |
+| `--task-list-row-gap`  | `0`                                | `var(--s-half)`                      |
+| `--task-c-bg` & co     | `transparent`                      | surfaces                             |
+
+Rows that draw their own box (planner, board and issue-panel items) take their
+top/bottom edge from `--task-row-edge`, so the separator and the box border never
+cancel each other out on one element. Bare `task` hosts use `--task-separator`.
+
 ## Shadows & Elevation
 
 - `--whiteframe-shadow-1dp` through `--whiteframe-shadow-24dp` — classic Material shadows
