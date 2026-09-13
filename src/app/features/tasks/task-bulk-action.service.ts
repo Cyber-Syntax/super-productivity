@@ -702,24 +702,29 @@ export class TaskBulkActionService {
   }
 
   /**
-   * The first unselected `<task>` after the last selected one in DOM order,
-   * else the last unselected one before it — captured *before* the action so
-   * keyboard focus has somewhere to land once the selected rows leave the view.
-   */
-  /**
    * Id of the row keyboard focus should land on if the selected rows leave the
    * list: the next unselected row after the selection, else the previous one.
    * Like the single-task path, subtask rows of a selected parent do not count
    * (they leave together with it). Resolved to an element only afterwards,
    * since rows may re-mount.
    */
-  private _getFocusTargetAfterRemoval(): string | null {
+  private _getFocusTargetAfterRemoval(): string | HTMLElement | null {
     if (isTouchActive()) {
       return null;
     }
     const selected = this._multiSelect.selectedIds();
-    const rows = Array.from(document.querySelectorAll<HTMLElement>('task')).filter(
+    const allRows = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        'task, planner-task[data-task-selectable="true"]',
+      ),
+    ).filter(
       (el) => !el.closest('task-detail-panel') && !this._multiSelect.isDestroyedHost(el),
+    );
+    const isPlannerSelection = allRows.some(
+      (row) => row.matches('planner-task') && selected.has(row.dataset.taskId ?? ''),
+    );
+    const rows = allRows.filter((row) =>
+      row.matches(isPlannerSelection ? 'planner-task' : 'task'),
     );
     const idOf = (el: HTMLElement): string => el.getAttribute('data-task-id') ?? '';
     const isInSelectedParent = (el: HTMLElement): boolean => {
@@ -748,7 +753,17 @@ export class TaskBulkActionService {
     const target =
       rows.slice(lastSelectedIndex + 1).find(isCandidate) ??
       rows.slice(0, lastSelectedIndex).reverse().find(isCandidate);
-    return target ? idOf(target) : null;
+    if (target) {
+      return idOf(target);
+    }
+    const selectedPlannerRow = rows.find(
+      (row) => row.matches('planner-task') && selected.has(idOf(row)),
+    );
+    return (
+      selectedPlannerRow
+        ?.closest<HTMLElement>('planner-day[data-planner-selection-scope]')
+        ?.querySelector<HTMLElement>('add-task-inline button') ?? null
+    );
   }
 
   /**
@@ -757,12 +772,12 @@ export class TaskBulkActionService {
    * selection is a working set that survives, so only keyboard focus is
    * restored. Cancelled dialogs and "nothing to do" never get here.
    */
-  private _finish(focusTargetId: string | null = null): void {
+  private _finish(focusTarget: string | HTMLElement | null = null): void {
     if (this._multiSelect.isTouchSelectionMode()) {
       this._multiSelect.clear();
       return;
     }
-    this._restoreFocus(focusTargetId);
+    this._restoreFocus(focusTarget);
   }
 
   /**
@@ -771,12 +786,9 @@ export class TaskBulkActionService {
    * DOM while its leave animation runs, so "gone" is asked from the selection
    * service, which knows the destroyed hosts.
    */
-  private _restoreFocus(targetId: string | null): void {
-    if (!targetId) {
-      return;
-    }
+  private _restoreFocus(target: string | HTMLElement | null): void {
     const active = document.activeElement;
-    const activeRow = active?.closest('task');
+    const activeRow = active?.closest('task, planner-task[data-task-selectable="true"]');
     const isFocusIntact =
       !!active &&
       active !== document.body &&
@@ -785,6 +797,10 @@ export class TaskBulkActionService {
     if (isFocusIntact) {
       return;
     }
-    this._multiSelect.findLiveRowEl(targetId)?.focus({ preventScroll: true });
+    const targetEl =
+      typeof target === 'string' ? this._multiSelect.findLiveRowEl(target) : target;
+    if (targetEl?.isConnected) {
+      targetEl.focus({ preventScroll: true });
+    }
   }
 }
