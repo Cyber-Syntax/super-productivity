@@ -3,14 +3,15 @@
 
 // TODO rename to task title component
 
-// .display-value, the edit textarea and .height-measure all take `font-size:
-// inherit`, so raising it on the host moves all three at once — the textarea
-// clears the iOS zoom threshold and stays measured correctly by
-// .height-measure. Raising only the textarea would desync that pair and
-// mis-size the box. Written out rather than via noIosFocusZoomOnTouch() because
-// that mixin nests as a descendant, which cannot target the host itself.
+// Keep display text, textarea and height measurement at the same size.
 :host-context(body.isTouchPrimary) {
-  @include noIosFocusZoom();
+  font-size: var(--font-size-md);
+
+  // iOS WebKit still needs 16px to prevent focus zoom. Feature detection also
+  // covers Safari/PWA, where the native-only body.isIOS class is absent.
+  @supports (-webkit-touch-callout: none) {
+    @include noIosFocusZoom();
+  }
 }
 
 :host {
