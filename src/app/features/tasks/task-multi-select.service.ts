@@ -22,6 +22,8 @@ export type MultiSelectDirection = 'up' | 'down';
 export class TaskMultiSelectService {
   private readonly _selectedIds = signal<ReadonlySet<string>>(new Set());
   private readonly _anchorId = signal<string | null>(null);
+  private _anchorRow: HTMLElement | null = null;
+  private _anchorScope: HTMLElement | null = null;
   private readonly _menuOpenRequest = signal<{ x: number; y: number } | null>(null);
   private readonly _bulkFeedbackSuppressionDepth = signal(0);
   private readonly _isTouchSelectionMode = signal(false);
@@ -102,6 +104,15 @@ export class TaskMultiSelectService {
     return this._focusedRow()?.id ?? null;
   }
 
+  /** Retain the originating list while focus is in the bulk menu or a dialog. */
+  selectionScope(): HTMLElement | null {
+    return (
+      this._focusedRow()?.el.closest<HTMLElement>(
+        '[data-board-selection-scope], [data-planner-selection-scope], .task-list-inner',
+      ) ?? this._anchorScope
+    );
+  }
+
   /** Ctrl/Cmd+click and `X`: toggle one task, which becomes the anchor. */
   toggle(id: string): void {
     const next = new Set(this._selectedIds());
@@ -113,6 +124,7 @@ export class TaskMultiSelectService {
     this._setSelectedIds(next);
     if (next.has(id)) {
       this._anchorId.set(id);
+      this._setAnchorRow(this._rowForNewAnchor(id));
     } else if (this._anchorId() === id) {
       // A deselected row must not stay the anchor of the next Shift+click.
       this._anchorId.set(null);
@@ -124,12 +136,15 @@ export class TaskMultiSelectService {
    * anchor's list, replacing the selection. Without an anchor, or when the
    * target sits in a different list, the target becomes the new anchor.
    */
-  selectRange(targetId: string, isAdditive = false): void {
+  selectRange(targetId: string, isAdditive = false, targetRow?: HTMLElement): void {
     const anchorId = this._anchorId();
-    const range = anchorId ? this._rangeInAnchorList(anchorId, targetId) : null;
+    const range = anchorId
+      ? this._rangeInAnchorList(anchorId, targetId, targetRow)
+      : null;
     if (!range) {
       this._selectedIds.set(new Set([targetId]));
       this._anchorId.set(targetId);
+      this._setAnchorRow(targetRow ?? this._rowForNewAnchor(targetId));
       return;
     }
     const next = isAdditive ? new Set(this._selectedIds()) : new Set<string>();
@@ -151,6 +166,7 @@ export class TaskMultiSelectService {
     if (!this._anchorId() || !this._selectedIds().size) {
       this._selectedIds.set(new Set([focusedId]));
       this._anchorId.set(focusedId);
+      this._setAnchorRow(focusedEl);
     }
     const siblings = this._listRowsFor(focusedEl);
     const index = siblings.indexOf(focusedEl);
@@ -159,7 +175,7 @@ export class TaskMultiSelectService {
     if (!nextEl || !nextId) {
       return null;
     }
-    this.selectRange(nextId);
+    this.selectRange(nextId, false, nextEl);
     nextEl.focus();
     return nextEl;
   }
@@ -197,6 +213,7 @@ export class TaskMultiSelectService {
       .filter((id): id is string => !!id);
     this._selectedIds.set(new Set(ids));
     this._anchorId.set(focusedId);
+    this._setAnchorRow(focusedEl);
   }
 
   /**
@@ -264,6 +281,7 @@ export class TaskMultiSelectService {
 
   /** Empties the selection and leaves touch selection mode. */
   clear(): void {
+    this._setAnchorRow(null);
     if (this._selectedIds().size) {
       this._selectedIds.set(new Set());
     }
@@ -289,12 +307,28 @@ export class TaskMultiSelectService {
     this._menuOpenRequest.set(null);
   }
 
-  private _rangeInAnchorList(anchorId: string, targetId: string): string[] | null {
-    const anchorEl = this._findRowEl(anchorId);
+  private _rangeInAnchorList(
+    anchorId: string,
+    targetId: string,
+    targetRow?: HTMLElement,
+  ): string[] | null {
+    const anchorEl =
+      this._anchorRow?.isConnected && !this._destroyedHosts.has(this._anchorRow)
+        ? this._anchorRow
+        : this._getAllTaskEls().find(
+            (el) =>
+              el.dataset.taskId === anchorId &&
+              (!this._anchorScope || this._anchorScope.contains(el)),
+          );
     if (!anchorEl) {
       return null;
     }
     const rows = this._listRowsFor(anchorEl);
+    // Identical task IDs can be rendered in different board panels. The clicked
+    // copy determines the range, not the first matching task elsewhere on screen.
+    const target = this._focusedRow();
+    const targetEl = targetRow ?? (target?.id === targetId ? target.el : null);
+    if (targetEl && !rows.includes(targetEl)) return null;
     const anchorIndex = rows.indexOf(anchorEl);
     const targetIndex = rows.findIndex(
       (el) => el.getAttribute('data-task-id') === targetId,
@@ -326,7 +360,9 @@ export class TaskMultiSelectService {
 
   /** Participating rows in the selection scope containing `el`. */
   private _listRowsFor(el: HTMLElement): HTMLElement[] {
-    const plannerScope = el.closest<HTMLElement>('[data-planner-selection-scope]');
+    const plannerScope = el.closest<HTMLElement>(
+      '[data-planner-selection-scope], [data-board-selection-scope]',
+    );
     if (plannerScope) {
       return Array.from(
         plannerScope.querySelectorAll<HTMLElement>(
@@ -344,7 +380,19 @@ export class TaskMultiSelectService {
     );
   }
 
-  /** The rendered row for a task id, ignoring copies inside the detail panel. */
+  private _setAnchorRow(row: HTMLElement | null): void {
+    this._anchorRow = row;
+    this._anchorScope =
+      row?.closest<HTMLElement>(
+        '[data-board-selection-scope], [data-planner-selection-scope], .task-list-inner',
+      ) ?? null;
+  }
+
+  private _rowForNewAnchor(id: string): HTMLElement | null {
+    const focused = this._focusedRow();
+    return focused?.id === id ? focused.el : this._findRowEl(id);
+  }
+
   private _findRowEl(id: string): HTMLElement | null {
     return (
       this._getAllTaskEls().find((el) => el.getAttribute('data-task-id') === id) ?? null

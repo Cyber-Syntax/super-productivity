@@ -27,6 +27,9 @@ import { TODAY_TAG } from '../../tag/tag.const';
 import { GlobalConfigService } from '../../config/global-config.service';
 import { DateService } from '../../../core/date/date.service';
 import { DateAdapter } from '@angular/material/core';
+import { DEFAULT_PANEL_CFG } from '../boards.const';
+import { BoardsActions } from '../store/boards.actions';
+import { TaskSharedActions } from '../../../root-store/meta/task-shared.actions';
 
 const PLANNER_TASK_PROVIDERS = [
   {
@@ -121,6 +124,7 @@ describe('BoardPanelComponent - Backlog Feature', () => {
     };
 
     await TestBed.configureTestingModule({
+      teardown: { destroyAfterEach: true },
       imports: [
         BoardPanelComponent,
         TranslateModule.forRoot({
@@ -281,6 +285,7 @@ describe('BoardPanelComponent - Hidden Project Backlog', () => {
     };
 
     await TestBed.configureTestingModule({
+      teardown: { destroyAfterEach: true },
       imports: [
         BoardPanelComponent,
         TranslateModule.forRoot({
@@ -374,6 +379,7 @@ describe('BoardPanelComponent - Tag match mode, sort, inline-create computeds', 
     };
 
     await TestBed.configureTestingModule({
+      teardown: { destroyAfterEach: true },
       imports: [
         BoardPanelComponent,
         TranslateModule.forRoot({
@@ -760,6 +766,7 @@ describe('BoardPanelComponent - drop()', () => {
     containerId?: string;
     previousIndex?: number;
     currentIndex?: number;
+    sourceTasks?: TaskCopy[];
   }): any => ({
     container: {
       id: opts.containerId ?? 'target',
@@ -767,6 +774,7 @@ describe('BoardPanelComponent - drop()', () => {
     },
     previousContainer: {
       id: opts.previousContainerId ?? 'source',
+      data: opts.sourceTasks ?? [opts.task],
     },
     item: { data: opts.task },
     previousIndex: opts.previousIndex ?? 0,
@@ -792,6 +800,7 @@ describe('BoardPanelComponent - drop()', () => {
     };
 
     await TestBed.configureTestingModule({
+      teardown: { destroyAfterEach: true },
       imports: [
         BoardPanelComponent,
         TranslateModule.forRoot({
@@ -860,9 +869,171 @@ describe('BoardPanelComponent - drop()', () => {
     expect(updateTagsSpy).not.toHaveBeenCalled();
   });
 
+  it('reorders selected rows in this panel using one order action', async () => {
+    await setup(['a', 'b', 'c', 'd'].map((id) => mkTask({ id })));
+    fixture.componentRef.setInput('panelCfg', { ...DEFAULT_PANEL_CFG, id: 'p' });
+    fixture.detectChanges();
+    component.multiSelect.toggle('b');
+    component.multiSelect.toggle('c');
+    component.reorder('b', 'down');
+    expect(dispatchSpy).toHaveBeenCalledOnceWith(
+      BoardsActions.updatePanelCfgTaskIds({
+        panelId: 'p',
+        taskIds: ['a', 'd', 'b', 'c'],
+      }),
+    );
+    expect(updateTagsSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not keyboard-reorder a sorted panel', async () => {
+    await setup(['a', 'b'].map((id) => mkTask({ id })));
+    fixture.componentRef.setInput('panelCfg', {
+      ...DEFAULT_PANEL_CFG,
+      id: 'p',
+      sortBy: 'title',
+    });
+    fixture.detectChanges();
+    component.reorder('b', 'up');
+    expect(dispatchSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not move or reorder a selection spanning panels', async () => {
+    await setup(['a', 'b', 'c'].map((id) => mkTask({ id })));
+    fixture.componentRef.setInput('panelCfg', { ...DEFAULT_PANEL_CFG, id: 'p' });
+    fixture.detectChanges();
+    component.multiSelect.toggle('a');
+    component.multiSelect.toggle('other-panel-task');
+    const adjacentSpy = spyOn(component.adjacentPanel, 'emit');
+
+    component.moveToAdjacent('a', 1);
+    component.reorder('a', 'down');
+    component.reorder('a', 'up');
+    await component.drop(
+      mkDropEvent({
+        panelCfg: component.panelCfg(),
+        task: mkTask({ id: 'a' }),
+        sourceTasks: component.tasks(),
+      }),
+    );
+
+    expect(adjacentSpy).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    expect(updateTagsSpy).not.toHaveBeenCalled();
+  });
+
+  it('moves a single-panel selection in source order, including duplicate cards', async () => {
+    await setup(['a', 'b', 'c'].map((id) => mkTask({ id })));
+    fixture.componentRef.setInput('panelCfg', { ...DEFAULT_PANEL_CFG, id: 'p' });
+    fixture.detectChanges();
+    component.multiSelect.toggle('c');
+    component.multiSelect.toggle('a');
+    const adjacentSpy = spyOn(component.adjacentPanel, 'emit');
+
+    component.moveToAdjacent('a', 1);
+
+    expect(adjacentSpy).toHaveBeenCalledOnceWith({
+      direction: 1,
+      rowIndex: 0,
+      taskIds: ['a', 'c'],
+      focusTaskId: 'a',
+    });
+    await component.drop(
+      mkDropEvent({
+        panelCfg: component.panelCfg(),
+        task: mkTask({ id: 'a' }),
+        sourceTasks: component.tasks(),
+        currentIndex: 0,
+      }),
+    );
+    expect(dispatchSpy).toHaveBeenCalledOnceWith(
+      BoardsActions.updatePanelCfgTaskIds({ panelId: 'p', taskIds: ['a', 'c', 'b'] }),
+    );
+  });
+
+  it('places duplicated incoming tasks once without reordering an unrelated target row', async () => {
+    await setup(['a', 'b', 'c'].map((id) => mkTask({ id })));
+    fixture.componentRef.setInput('panelCfg', { ...DEFAULT_PANEL_CFG, id: 'p' });
+    fixture.detectChanges();
+    await component.moveTasks(['c', 'c'], 0);
+    expect(dispatchSpy).toHaveBeenCalledOnceWith(
+      BoardsActions.updatePanelCfgTaskIds({
+        panelId: 'p',
+        taskIds: ['c', 'a', 'b'],
+      }),
+    );
+    expect(component.multiSelect.isBulkFeedbackSuppressed()).toBeFalse();
+  });
+
+  for (const direction of ['up', 'down'] as const) {
+    it(`requests the adjacent vertical panel when moving ${direction} at the boundary`, async () => {
+      await setup(['a', 'b', 'c'].map((id) => mkTask({ id })));
+      fixture.componentRef.setInput('panelCfg', { ...DEFAULT_PANEL_CFG, id: 'p' });
+      fixture.detectChanges();
+      const focusTaskId = direction === 'up' ? 'a' : 'c';
+      component.multiSelect.toggle(focusTaskId);
+      component.multiSelect.toggle('b');
+      const adjacentSpy = spyOn(component.adjacentPanel, 'emit');
+
+      component.reorder(focusTaskId, direction);
+
+      expect(adjacentSpy).toHaveBeenCalledOnceWith({
+        direction,
+        rowIndex: 0,
+        taskIds: direction === 'up' ? ['a', 'b'] : ['b', 'c'],
+        focusTaskId,
+      });
+      expect(dispatchSpy).not.toHaveBeenCalled();
+    });
+  }
+
+  it('uses the same destination tags and completion rule for every selected task', async () => {
+    const tasks = ['a', 'b'].map((id) => mkTask({ id }));
+    await setup(tasks);
+    fixture.componentRef.setInput('panelCfg', {
+      ...DEFAULT_PANEL_CFG,
+      id: 'p',
+      includedTagIds: ['in-progress'],
+      taskDoneState: 2,
+    });
+    fixture.detectChanges();
+    await component.moveTasks(['a', 'b']);
+    for (const task of tasks) {
+      expect(updateTagsSpy).toHaveBeenCalledWith(task, ['in-progress']);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        TaskSharedActions.updateTask({
+          task: { id: task.id, changes: { isDone: true } },
+        }),
+      );
+    }
+    expect(dispatchSpy.calls.mostRecent().args[0]).toEqual(
+      BoardsActions.updatePanelCfgTaskIds({ panelId: 'p', taskIds: ['a', 'b'] }),
+    );
+  });
+
+  it('asks for one schedule before mutations and cancels the whole placement', async () => {
+    await setup(['a', 'b'].map((id) => mkTask({ id })));
+    fixture.componentRef.setInput('panelCfg', {
+      ...DEFAULT_PANEL_CFG,
+      id: 'p',
+      includedTagIds: ['required'],
+      scheduledState: 2,
+    });
+    fixture.detectChanges();
+    const open = jasmine
+      .createSpy('open')
+      .and.returnValue({ afterClosed: () => of(undefined) });
+    TestBed.inject(MatDialog).open = open;
+    expect(await component.moveTasks(['a', 'b'])).toBeFalse();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    expect(updateTagsSpy).not.toHaveBeenCalled();
+    expect(component.isMoving()).toBeFalse();
+  });
+
   it('cross-panel drop with AND-excluded strips only the FIRST excluded and adds first missing included', async () => {
     // Arrange — target panel: includes 'need' (any), excludes ['x','y'] (all)
-    await setup([]);
+    const task = mkTask({ id: 't1', tagIds: ['x', 'y', 'keep'] });
+    await setup([task]);
     const panelCfg = {
       id: 'target',
       title: 'Target',
@@ -879,8 +1050,6 @@ describe('BoardPanelComponent - drop()', () => {
     fixture.componentRef.setInput('panelCfg', panelCfg);
     fixture.detectChanges();
 
-    const task = mkTask({ id: 't1', tagIds: ['x', 'y', 'keep'] });
-
     // Act
     await component.drop(mkDropEvent({ panelCfg, task }));
 
@@ -893,7 +1062,8 @@ describe('BoardPanelComponent - drop()', () => {
 
   it('cross-panel drop with OR-included and no exclusion adds the first required tag', async () => {
     // Arrange — target panel: includes ['need'] in 'any' mode, no exclusions
-    await setup([]);
+    const task = mkTask({ id: 't1', tagIds: ['other'] });
+    await setup([task]);
     const panelCfg = {
       id: 'target',
       title: 'Target',
@@ -908,8 +1078,6 @@ describe('BoardPanelComponent - drop()', () => {
     } as BoardPanelCfg;
     fixture.componentRef.setInput('panelCfg', panelCfg);
     fixture.detectChanges();
-
-    const task = mkTask({ id: 't1', tagIds: ['other'] });
 
     // Act
     await component.drop(mkDropEvent({ panelCfg, task }));
@@ -926,7 +1094,8 @@ describe('BoardPanelComponent - drop()', () => {
   // syncs the corruption to every device.
   it('cross-panel drop never writes the virtual TODAY_TAG into the task', async () => {
     // Arrange
-    await setup([]);
+    const task = mkTask({ id: 't1', tagIds: ['other'] });
+    await setup([task]);
     const panelCfg = {
       id: 'target',
       title: 'Target',
@@ -940,8 +1109,6 @@ describe('BoardPanelComponent - drop()', () => {
     } as BoardPanelCfg;
     fixture.componentRef.setInput('panelCfg', panelCfg);
     fixture.detectChanges();
-
-    const task = mkTask({ id: 't1', tagIds: ['other'] });
 
     // Act
     await component.drop(mkDropEvent({ panelCfg, task }));

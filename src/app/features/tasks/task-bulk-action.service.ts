@@ -713,8 +713,10 @@ export class TaskBulkActionService {
       return null;
     }
     const selected = this._multiSelect.selectedIds();
+    const scope = this._multiSelect.selectionScope();
+    const boardScope = scope?.matches('[data-board-selection-scope]') ? scope : null;
     const allRows = Array.from(
-      document.querySelectorAll<HTMLElement>(
+      (boardScope ?? document).querySelectorAll<HTMLElement>(
         'task, planner-task[data-task-selectable="true"]',
       ),
     ).filter(
@@ -754,14 +756,16 @@ export class TaskBulkActionService {
       rows.slice(lastSelectedIndex + 1).find(isCandidate) ??
       rows.slice(0, lastSelectedIndex).reverse().find(isCandidate);
     if (target) {
-      return idOf(target);
+      return boardScope ? target : idOf(target);
     }
     const selectedPlannerRow = rows.find(
       (row) => row.matches('planner-task') && selected.has(idOf(row)),
     );
     return (
       selectedPlannerRow
-        ?.closest<HTMLElement>('planner-day[data-planner-selection-scope]')
+        ?.closest<HTMLElement>(
+          'planner-day[data-planner-selection-scope], [data-board-selection-scope]',
+        )
         ?.querySelector<HTMLElement>('add-task-inline button') ?? null
     );
   }

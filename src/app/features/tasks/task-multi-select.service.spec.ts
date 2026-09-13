@@ -110,6 +110,82 @@ describe('TaskMultiSelectService', () => {
   });
 
   describe('selectRange', () => {
+    const boardRows = (): HTMLElement[][] => {
+      const panels = [
+        ['shared', 'left'],
+        ['shared', 'middle', 'last'],
+      ].map((ids, i) => {
+        const panel = document.createElement('board-panel');
+        panel.setAttribute('data-board-selection-scope', String(i));
+        root.appendChild(panel);
+        return ids.map((id) => {
+          const row = document.createElement('planner-task');
+          row.dataset.taskId = id;
+          row.dataset.taskSelectable = 'true';
+          row.tabIndex = 0;
+          panel.appendChild(row);
+          return row;
+        });
+      });
+      return panels;
+    };
+
+    it('anchors a board range to the selected copy of a duplicated task', () => {
+      const [, right] = boardRows();
+      stubActiveElement(right[0]);
+      service.toggle('shared');
+      stubActiveElement(right[2]);
+      service.selectRange('last');
+      expect(selected()).toEqual(['last', 'middle', 'shared']);
+      expect(service.selectedIdsInDomOrder()).toEqual(['shared', 'middle', 'last']);
+    });
+
+    it('starts a new range when clicking a duplicate in another panel', () => {
+      const [left, right] = boardRows();
+      stubActiveElement(right[2]);
+      service.toggle('last');
+      stubActiveElement(left[0]);
+      service.selectRange('shared');
+      expect(selected()).toEqual(['shared']);
+      stubActiveElement(left[1]);
+      service.selectRange('left');
+      expect(selected()).toEqual(['left', 'shared']);
+    });
+
+    it('selects only the focused panel with select-all and keyboard extension', () => {
+      const [, right] = boardRows();
+      stubActiveElement(right[0]);
+      service.selectAllInListOfFocused();
+      expect(selected()).toEqual(['last', 'middle', 'shared']);
+      service.clear();
+      expect(extend('down')).toBe(right[1]);
+      expect(selected()).toEqual(['middle', 'shared']);
+    });
+
+    it('starts keyboard ranges in the focused panel when its tasks also occur at the old anchor', () => {
+      const [left, right] = boardRows();
+      left[1].dataset.taskId = 'middle';
+      stubActiveElement(left[0]);
+      service.toggle('shared');
+      stubActiveElement(right[0]);
+      expect(extend('down')).toBe(right[1]);
+      expect(selected()).toEqual(['middle']);
+      expect(extend('down')).toBe(right[2]);
+      expect(selected()).toEqual(['last', 'middle']);
+    });
+
+    it('remembers the originating panel after its anchor card leaves', () => {
+      const [, right] = boardRows();
+      const scope = right[0].parentElement;
+      stubActiveElement(right[0]);
+      service.toggle('shared');
+      right[0].remove();
+      stubActiveElement(document.body);
+      expect(service.selectionScope()).toBe(scope);
+      service.clear();
+      expect(service.selectionScope()).toBeNull();
+    });
+
     it('ranges across all-day and timed Planner rows within one day only', () => {
       stubActiveElement(root.querySelector('planner-task[data-task-id="p1"]'));
       service.toggle('p1');

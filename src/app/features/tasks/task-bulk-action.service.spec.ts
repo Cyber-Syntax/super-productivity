@@ -42,6 +42,7 @@ describe('TaskBulkActionService', () => {
     setBulkFeedbackSuppressed: (v: boolean) => void;
     isDestroyedHost: (el: Element) => boolean;
     findLiveRowEl: () => HTMLElement | null;
+    selectionScope: () => HTMLElement | null;
     isTouchSelectionMode: ReturnType<typeof signal<boolean>>;
   };
   let dialogResult: unknown;
@@ -124,6 +125,7 @@ describe('TaskBulkActionService', () => {
         suppressionDepth.update((depth) => (v ? depth + 1 : Math.max(0, depth - 1))),
       isDestroyedHost: (_el: Element) => false,
       findLiveRowEl: () => null,
+      selectionScope: () => null,
       isTouchSelectionMode: signal(false),
     };
 
@@ -253,6 +255,7 @@ describe('TaskBulkActionService', () => {
       unrelatedTask.setAttribute('data-task-id', 'unrelated');
       document.body.append(otherDay, day, unrelatedTask);
       row.focus();
+      spyOnProperty(document, 'activeElement', 'get').and.returnValue(row);
       let isDestroyed = false;
       multiSelect.isDestroyedHost = (el: Element) => isDestroyed && el === row;
       taskService.remove.and.callFake(() => {
@@ -266,6 +269,34 @@ describe('TaskBulkActionService', () => {
       otherDay.remove();
       day.remove();
       unrelatedTask.remove();
+    });
+
+    it('restores focus in the originating board panel when the bulk menu had focus', async () => {
+      isConfirmBeforeDelete = false;
+      select([t('selected')]);
+      const root = document.createElement('div');
+      root.innerHTML = `
+        <board-panel data-board-selection-scope="first">
+          <planner-task data-task-selectable="true" data-task-id="remaining" tabindex="0"></planner-task>
+        </board-panel>
+        <board-panel data-board-selection-scope="second">
+          <planner-task data-task-selectable="true" data-task-id="selected" tabindex="0"></planner-task>
+          <planner-task data-task-selectable="true" data-task-id="remaining" tabindex="0"></planner-task>
+        </board-panel>`;
+      document.body.appendChild(root);
+      try {
+        const panel = root.querySelector<HTMLElement>(
+          '[data-board-selection-scope="second"]',
+        )!;
+        const remaining = panel.querySelector<HTMLElement>('[data-task-id="remaining"]')!;
+        multiSelect.selectionScope = () => panel;
+        spyOnProperty(document, 'activeElement', 'get').and.returnValue(document.body);
+        spyOn(remaining, 'focus');
+        await service.deleteSelected();
+        expect(remaining.focus).toHaveBeenCalled();
+      } finally {
+        root.remove();
+      }
     });
 
     it('confirms, dedupes subtasks of selected parents, and splits lone subtasks off', async () => {
