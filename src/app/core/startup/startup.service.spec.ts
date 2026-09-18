@@ -301,40 +301,27 @@ describe('StartupService', () => {
       expect(result).toBe(false);
     });
 
+    // Spy on the prototype getter rather than defining an own property on
+    // `navigator`: an own property survives the test and shadows the prototype
+    // getter for every later spec that spies on it.
     it('should return false for NIGHTWATCH user agent', () => {
-      const originalUserAgent = navigator.userAgent;
-      Object.defineProperty(navigator, 'userAgent', {
-        value: 'NIGHTWATCH',
-        configurable: true,
-      });
+      spyOnProperty(Navigator.prototype, 'userAgent', 'get').and.returnValue(
+        'NIGHTWATCH',
+      );
 
       const result = (service as any)._isTourLikelyToBeShown();
 
       expect(result).toBe(false);
-
-      // Restore
-      Object.defineProperty(navigator, 'userAgent', {
-        value: originalUserAgent,
-        configurable: true,
-      });
     });
 
     it('should return false for PLAYWRIGHT user agent', () => {
-      const originalUserAgent = navigator.userAgent;
-      Object.defineProperty(navigator, 'userAgent', {
-        value: 'Something PLAYWRIGHT Something',
-        configurable: true,
-      });
+      spyOnProperty(Navigator.prototype, 'userAgent', 'get').and.returnValue(
+        'Something PLAYWRIGHT Something',
+      );
 
       const result = (service as any)._isTourLikelyToBeShown();
 
       expect(result).toBe(false);
-
-      // Restore
-      Object.defineProperty(navigator, 'userAgent', {
-        value: originalUserAgent,
-        configurable: true,
-      });
     });
 
     it('should return false when more than 2 projects exist', () => {
