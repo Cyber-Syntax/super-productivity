@@ -380,7 +380,10 @@ export class PluginOAuthService {
       // Only a real rejection by the authorization server means the refresh token is
       // dead. Dropping credentials on a transient failure (offline, 5xx, proxy error)
       // silently deletes them from disk and forces a full re-consent — see #9939.
-      if (isTerminalOAuthRefreshError(err)) {
+      // Same store-identity guard as the success path: a slow refresh can land
+      // after the user re-authenticated, and deleting then drops a brand-new
+      // valid grant from memory and (via tokenInvalidated$) from IndexedDB.
+      if (isTerminalOAuthRefreshError(err) && this._tokenStore.get(pluginId) === tokens) {
         this._tokenStore.delete(pluginId);
         this.tokenInvalidated$.next(pluginId);
       }
