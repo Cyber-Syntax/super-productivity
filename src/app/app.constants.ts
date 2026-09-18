@@ -115,6 +115,7 @@ export enum BodyClass {
 
   // iOS-specific classes
   isIOS = 'isIOS',
+  isIOSWebKit = 'isIOSWebKit',
   isIPad = 'isIPad',
   isNativeMobile = 'isNativeMobile',
   isKeyboardVisible = 'isKeyboardVisible',

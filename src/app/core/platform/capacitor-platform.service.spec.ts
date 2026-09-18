@@ -59,6 +59,26 @@ describe('CapacitorPlatformService', () => {
     });
   });
 
+  describe('isIOSWebKit', () => {
+    // Styles that clear the iOS 16px focus-zoom threshold key off this, so it
+    // must stay false where the zoom does not happen. Karma runs desktop Chrome.
+    it('should be false in a desktop browser', () => {
+      expect(service.isIOSWebKit()).toBe(false);
+    });
+
+    // The case isIOS() misses: _detectPlatform() deliberately reports an iOS
+    // browser as 'web', but WKWebView zooms there exactly as it does natively,
+    // so the engine check must still be true.
+    it('should be true for an iOS browser that reports platform web', () => {
+      spyOnProperty(Navigator.prototype, 'userAgent', 'get').and.returnValue(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+      );
+
+      expect(service.isIOS()).toBe(false);
+      expect(service.isIOSWebKit()).toBe(true);
+    });
+  });
+
   describe('isLegacyAndroidWebView', () => {
     const setup = (isAndroidWebView: boolean): CapacitorPlatformService => {
       TestBed.resetTestingModule();
