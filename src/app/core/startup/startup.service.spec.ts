@@ -350,16 +350,21 @@ describe('StartupService', () => {
   });
 
   describe('_requestPersistence (private)', () => {
+    // Same reason as the user-agent stub above: defining `storage` on
+    // `navigator` itself leaks the mock into every later spec in the run.
+    const stubStorage = (storage: unknown): void => {
+      spyOnProperty(Navigator.prototype, 'storage', 'get').and.returnValue(
+        storage as StorageManager,
+      );
+    };
+
     it('should request persistent storage', fakeAsync(() => {
       const mockStorage = {
         persisted: jasmine.createSpy().and.returnValue(Promise.resolve(false)),
         persist: jasmine.createSpy().and.returnValue(Promise.resolve(true)),
         estimate: jasmine.createSpy(),
       };
-      Object.defineProperty(navigator, 'storage', {
-        value: mockStorage,
-        configurable: true,
-      });
+      stubStorage(mockStorage);
 
       (service as any)._requestPersistence();
       tick();
@@ -376,10 +381,7 @@ describe('StartupService', () => {
         persist: jasmine.createSpy(),
         estimate: jasmine.createSpy(),
       };
-      Object.defineProperty(navigator, 'storage', {
-        value: mockStorage,
-        configurable: true,
-      });
+      stubStorage(mockStorage);
 
       (service as any)._requestPersistence();
       tick();
