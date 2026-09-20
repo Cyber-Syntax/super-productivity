@@ -19,6 +19,7 @@ import {
   getDeferredActions,
 } from './operation-capture.meta-reducer';
 import { ClientIdService } from '../../core/util/client-id.service';
+import { reducerFailureGuardMetaReducer } from '../../root-store/meta/reducer-failure-guard.meta-reducer';
 import { OperationCaptureService } from './operation-capture.service';
 import { TaskSharedActions } from '../../root-store/meta/task-shared.actions';
 import { T } from '../../t.const';
@@ -167,6 +168,27 @@ describe('OperationLogEffects', () => {
       effects.persistOperation$.subscribe({
         complete: () => {
           expect(mockOpLogStore.appendWithVectorClockOverwrite).not.toHaveBeenCalled();
+          done();
+        },
+      });
+    });
+
+    it('should skip actions the reducer rejected (#10195): no op, no pending decrement', (done) => {
+      // Run the real guard over a throwing reducer so the action is marked the
+      // same way it is in the app (rejected by instance, no pending increment).
+      const action = createPersistentAction(ActionType.TASK_SHARED_UPDATE);
+      (window.confirm as jasmine.Spy).and.returnValue(false);
+      reducerFailureGuardMetaReducer<unknown>(() => {
+        throw new Error('reducer boom');
+      })({}, action);
+      (window.confirm as jasmine.Spy).and.returnValue(true);
+      actions$ = of(action);
+
+      effects.persistOperation$.subscribe({
+        complete: () => {
+          expect(mockOpLogStore.appendWithVectorClockOverwrite).not.toHaveBeenCalled();
+          expect(mockOpLogStore.append).not.toHaveBeenCalled();
+          expect(mockOperationCaptureService.decrementPending).not.toHaveBeenCalled();
           done();
         },
       });
