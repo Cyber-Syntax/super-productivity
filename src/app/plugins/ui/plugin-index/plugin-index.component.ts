@@ -190,11 +190,36 @@ export class PluginIndexComponent implements OnInit, OnDestroy {
     this._router.navigate(['/config'], { fragment: 'plugins' });
   }
 
+  /**
+   * Enabling a plugin flips its toggle before its assets finish loading, so a
+   * user who opens the plugin right away hits an empty index.html cache.
+   * Wait for an in-flight activation instead of failing on the first read.
+   */
+  private async _getIndexHtmlWhenLoaded(pluginId: string): Promise<string | null> {
+    const indexContent = this._pluginService.getPluginIndexHtml(pluginId);
+    if (indexContent) {
+      return indexContent;
+    }
+    if (this._pluginService.pluginStates().get(pluginId)?.status !== 'loading') {
+      return null;
+    }
+    PluginLog.log(`Plugin ${pluginId} is still loading, waiting before opening index`);
+    // activatePlugin() blocks until an in-flight load settles
+    await this._pluginService.activatePlugin(pluginId);
+    return this._pluginService.getPluginIndexHtml(pluginId);
+  }
+
   private async _loadPluginIndex(pluginId: string): Promise<void> {
     PluginLog.log(`Loading plugin index for: ${pluginId}`);
 
     // Get the plugin index.html content
-    const indexContent = this._pluginService.getPluginIndexHtml(pluginId);
+    const indexContent = await this._getIndexHtmlWhenLoaded(pluginId);
+    // The wait above can take seconds; if the user switched plugins meanwhile,
+    // the newer navigation owns the iframe and this load must not overwrite it.
+    if (this.pluginId() !== pluginId) {
+      PluginLog.log(`Plugin ${pluginId} load superseded by ${this.pluginId()}`);
+      return;
+    }
     if (!indexContent) {
       PluginLog.err(`No index.html content found for plugin: ${pluginId}`);
       // Try to get the plugin instance to check if it should have an index.html
