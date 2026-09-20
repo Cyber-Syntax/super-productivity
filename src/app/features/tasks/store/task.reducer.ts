@@ -289,13 +289,28 @@ export const taskReducer = createReducer<TaskState>(
   // task as done forever (#9904).
   on(setCurrentTask, (state, { id }) => {
     if (id) {
-      const task = getTaskById(id, state);
+      // A dialog can hold a task id across a remote `moveToArchive` that removes
+      // the entity (idle dialog: it captures lastCurrentTaskId on open and calls
+      // setCurrentId on confirm). Throwing here escapes the NgRx `State` scan —
+      // there is no boxing meta-reducer for this action — which tears down the
+      // state subscription and silently freezes the store until restart.
+      // This action is non-persistent, so falling back to "nothing tracked"
+      // changes no synced data.
+      const task = state.entities[id];
+      if (!task) {
+        TaskLog.warn('setCurrentTask: task not found, unsetting current task', { id });
+        return {
+          ...state,
+          currentTaskId: null,
+        };
+      }
       const subTaskIds = task.subTaskIds;
       let taskToStartId = id;
       if (subTaskIds && subTaskIds.length) {
+        // A sub task can be gone for the same reason — skip it instead of throwing.
         const undoneTasks = subTaskIds
-          .map((tid) => getTaskById(tid, state))
-          .filter((ta: Task) => !ta.isDone);
+          .map((tid) => state.entities[tid])
+          .filter((ta): ta is Task => !!ta && !ta.isDone);
         taskToStartId = undoneTasks.length ? undoneTasks[0].id : subTaskIds[0];
       }
       return {
@@ -472,7 +487,15 @@ export const taskReducer = createReducer<TaskState>(
   ),
 
   on(removeTimeSpent, (state, { id, date, duration }) => {
-    const task = getTaskById(id, state);
+    // Mirrors the addTimeSpent guard above: the idle dialog untracks idle time
+    // for the task that was current when idling started, which a remote
+    // `moveToArchive` may have removed meanwhile. Throwing would tear down the
+    // NgRx state subscription and freeze the store.
+    const task = state.entities[id];
+    if (!task) {
+      TaskLog.warn('removeTimeSpent: task not found, skipping', { id });
+      return state;
+    }
     const currentTimeSpentForTickDay =
       (task.timeSpentOnDay && +task.timeSpentOnDay[date]) || 0;
 
