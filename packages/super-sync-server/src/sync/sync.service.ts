@@ -467,29 +467,6 @@ export class SyncService {
             );
           }
 
-          // Update device last seen
-          await tx.syncDevice.upsert({
-            where: {
-              // Prisma composite key naming uses underscores; allow it here
-              // eslint-disable-next-line @typescript-eslint/naming-convention
-              userId_clientId: {
-                userId,
-                clientId,
-              },
-            },
-            create: {
-              userId,
-              clientId,
-              lastSeenAt: BigInt(now),
-              createdAt: BigInt(now),
-              lastAckedSeq: 0,
-            },
-            update: {
-              lastSeenAt: BigInt(now),
-            },
-          });
-          uploadDbRoundtrips++;
-
           // W1: write the storage counter as the LAST statement before COMMIT
           // so the row-level write lock on `users` is held for only the
           // commit round-trip, not for the entire 60s transaction window.
@@ -535,6 +512,18 @@ export class SyncService {
         this.storageQuotaService.clearForUser(userId);
         this.requestDeduplicationService.clearForUser(userId);
       }
+
+      // Outside the RepeatableRead transaction on purpose: the download route
+      // touches the same (user_id, client_id) row fire-and-forget, and a touch
+      // committing between this transaction's snapshot and its own upsert
+      // aborted the WHOLE upload with a serialization failure (40001). Seen
+      // reproducibly right after a clean slate or wipe, when the row does not
+      // exist yet and both sides INSERT it. As a standalone statement the two
+      // writes just serialize on the row lock. Trade-off: a full wipe
+      // (deleteAllUserData) landing in this gap leaves a device row with no
+      // ops behind it; the row is advisory and ages out of the device list,
+      // and the download-route touch has always had the same window.
+      await this.registerUploadDevice(userId, clientId, now);
 
       const accepted = results.filter((result) => result.accepted).length;
       Logger.info('UPLOAD_BATCH_SUMMARY', {
@@ -626,10 +615,43 @@ export class SyncService {
   }
 
   /**
+   * Records the uploading device (`lastSeenAt`) once the upload transaction
+   * has committed. Advisory metadata for the device list: a failure here must
+   * never turn an accepted upload into an error.
+   */
+  private async registerUploadDevice(
+    userId: number,
+    clientId: string,
+    now: number,
+  ): Promise<void> {
+    try {
+      await prisma.syncDevice.upsert({
+        where: {
+          // Prisma composite key naming uses underscores; allow it here
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          userId_clientId: { userId, clientId },
+        },
+        create: {
+          userId,
+          clientId,
+          lastSeenAt: BigInt(now),
+          createdAt: BigInt(now),
+          lastAckedSeq: 0,
+        },
+        update: { lastSeenAt: BigInt(now) },
+      });
+    } catch (err) {
+      Logger.debug(
+        `[user:${userId}] registerUploadDevice failed: ${(err as Error)?.message}`,
+      );
+    }
+  }
+
+  /**
    * Keeps the device row alive for the device list. Called from the download
    * ROUTE only — not from `getOpsSinceWithSeq`, whose other callers (the
    * upload handler's piggyback and dedup-retry reads) run right after the
-   * upload transaction already upserted `lastSeenAt`, so a touch there is a
+   * upload already upserted `lastSeenAt`, so a touch there is a
    * guaranteed-suppressed extra statement per upload. Fire-and-forget and
    * deliberately outside any transaction: this is advisory metadata for a UI
    * list and must never fail, slow, or lengthen the lock window of a sync.

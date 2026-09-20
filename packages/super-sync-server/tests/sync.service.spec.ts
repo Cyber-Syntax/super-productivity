@@ -718,12 +718,13 @@ vi.mock('../src/db', async () => {
       },
       syncDevice: {
         upsert: vi.fn().mockImplementation(async (args: any) => {
-          const key = `${args.where.clientId_userId.userId}:${args.where.clientId_userId.clientId}`;
+          const compositeKey = args.where.userId_clientId ?? args.where.clientId_userId;
+          const key = `${compositeKey.userId}:${compositeKey.clientId}`;
           const result = {
             ...args.create,
             ...args.update,
-            userId: args.where.clientId_userId.userId,
-            clientId: args.where.clientId_userId.clientId,
+            userId: compositeKey.userId,
+            clientId: compositeKey.clientId,
           };
           state.syncDevices.set(key, result);
           return result;
@@ -4280,6 +4281,44 @@ describe('SyncService', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(executeRawSpy).not.toHaveBeenCalled();
+    });
+
+    it('uploadOps registers the device only after the transaction has committed', async () => {
+      // A download-route touch on the same row used to abort the whole upload
+      // transaction with a serialization failure (40001) — reproducibly right
+      // after a clean slate or wipe, when the device row does not exist yet.
+      const service = getSyncService();
+      const { prisma } = await import('../src/db');
+      const upsertSpy = vi.mocked(prisma.syncDevice.upsert);
+      upsertSpy.mockClear();
+      const txSpy = vi.mocked(prisma.$transaction);
+      const runTx = txSpy.getMockImplementation()!;
+      const runUpsert = upsertSpy.getMockImplementation()!;
+      let txCommitted = false;
+      let upsertRanAfterCommit: boolean | undefined;
+      txSpy.mockImplementationOnce(async (...args: any[]) => {
+        const result = await (runTx as any)(...args);
+        txCommitted = true;
+        return result;
+      });
+      upsertSpy.mockImplementationOnce((async (args: any) => {
+        upsertRanAfterCommit = txCommitted;
+        return runUpsert(args);
+      }) as any);
+
+      const results = await service.uploadOps(userId, clientId, [
+        makeOp({ id: 'dev-op' }),
+      ]);
+
+      expect(results[0]?.accepted).toBe(true);
+      expect(upsertRanAfterCommit).toBe(true);
+      expect(upsertSpy).toHaveBeenCalledTimes(1);
+      expect(upsertSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId_clientId: { userId, clientId } },
+        }),
+      );
+      expect(testState.syncDevices.has(`${userId}:${clientId}`)).toBe(true);
     });
 
     it('touchDevice() runs the device-row touch (wired to the download route only)', async () => {
