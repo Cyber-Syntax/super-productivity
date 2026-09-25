@@ -804,14 +804,18 @@ IDs deduplicate ops still in the local log, while vector clocks carry causality.
    here since. The clock half is needed because the cursor can run ahead of
    applied ops: an upload merges into the freshly read file and sets the
    cursor to the new version. Legacy ops without `sv` use the file's
-   `syncVersion` as an upper bound. Seq-0 downloads and downloads after a gap
-   reset do not use this filter. Known gaps: the guard assumes each author's
-   counter never goes backwards (a device that keeps its clientId but adopts
-   a lower own clock, e.g. USE_REMOTE after another device's USE_LOCAL, could
-   have a new op skipped when the cursor also ran ahead; reproduced by
-   pending tests in the #10119 integration spec, fix tracked in #10239); and a
-   remote op whose apply failed is no longer retried once compaction prunes it,
-   matching SuperSync.
+   `syncVersion` as a conservative upper bound. After local compaction prunes
+   such an op's applied ID, a later file write advances this upper bound past
+   the cursor, so the old op can be re-applied (reproduced for v2 and v3 with
+   an archived task). Skipping it on clock coverage alone is unsafe: conflict
+   resolution can merge a remote clock even when its op was not applied locally.
+   Seq-0 downloads and downloads after a gap reset do not use this filter. Other
+   known gaps: the guard assumes each author's counter never goes backwards (a
+   device that keeps its clientId but adopts a lower own clock, e.g. USE_REMOTE
+   after another device's USE_LOCAL, could have a new op skipped when the cursor
+   also ran ahead; reproduced by pending tests in the #10119 integration spec,
+   fix tracked in #10239); and a remote op whose apply failed is no longer
+   retried once compaction prunes it, matching SuperSync.
 2. **Fresh client / forced seq-0:** return a full state/archive baseline. In v2,
    that baseline represents the monolith and its retained ops. In v3, the ops
    file points to a validated snapshot generation; retained ops newer than the
