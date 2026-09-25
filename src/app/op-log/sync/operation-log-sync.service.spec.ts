@@ -6531,6 +6531,8 @@ describe('OperationLogSyncService', () => {
         const conflictError = error as LocalDataConflictError;
         expect(conflictError.unsyncedCount).toBe(0);
         expect(conflictError.lastSyncedVectorClock).toBeNull();
+        // No snapshot, so no remote state — not a fake empty one (#9391).
+        expect(conflictError.remoteSnapshotState).toBeNull();
       }
     });
 

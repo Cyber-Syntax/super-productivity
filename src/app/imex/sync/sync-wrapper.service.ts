@@ -1689,7 +1689,7 @@ export class SyncWrapperService {
           revMap: {},
           crossModelVersion: 1,
           mainModelData: snapshotConflict?.remoteSnapshotState ?? {},
-          isFullData: !!snapshotConflict,
+          isFullData: !!snapshotConflict?.remoteSnapshotState,
           vectorClock: snapshotConflict?.remoteVectorClock,
         },
         local: {
