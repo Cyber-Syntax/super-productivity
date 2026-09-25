@@ -22,7 +22,7 @@ export const BUNDLED_PLUGIN_PATHS = [
   'assets/bundled-plugins/caldav-calendar-provider',
   'assets/bundled-plugins/doc-mode',
   'assets/bundled-plugins/todoist-import',
-  'assets/bundled-plugins/parallel-code',
+  // Defer parallel-code until registerTaskContextMenuEntry (#9617) is available.
 ] as const;
 
 // Reserved ids: an uploaded plugin may not reuse a bundled plugin's manifest id (it would
@@ -45,7 +45,7 @@ export const BUNDLED_PLUGIN_IDS = new Set<string>([
   'github-issue-provider',
   'google-calendar-provider',
   'linear-issue-provider',
-  'parallel-code',
+  'parallel-code', // Keep the id reserved while its bundled entry is deferred.
   'procrastination-buster',
   'sync-md',
   'todoist-import',
