@@ -701,9 +701,9 @@ describe('OneDrive', () => {
           headers: { 'content-type': 'application/json' }, // eslint-disable-line @typescript-eslint/naming-convention
           // CapacitorHttp auto-parses JSON responses into an object.
           data: {
-            access_token: 'new-access', // eslint-disable-line @typescript-eslint/naming-convention
-            refresh_token: 'new-refresh', // eslint-disable-line @typescript-eslint/naming-convention
-            expires_in: 3600, // eslint-disable-line @typescript-eslint/naming-convention
+            access_token: 'new-access',
+            refresh_token: 'new-refresh',
+            expires_in: 3600,
           },
         });
         warnSpy = jasmine.createSpy('warn');
@@ -818,7 +818,7 @@ describe('OneDrive', () => {
           headers: {},
           data: {
             error: 'invalid_request',
-            error_description: 'AADSTS90023: Cross-origin token redemption ...', // eslint-disable-line @typescript-eslint/naming-convention
+            error_description: 'AADSTS90023: Cross-origin token redemption ...',
           },
         });
 
@@ -873,7 +873,7 @@ describe('OneDrive', () => {
     fetchSpy.and.resolveTo({
       ok: true,
       status: 200,
-      json: async () => ({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }), // eslint-disable-line @typescript-eslint/naming-convention
+      json: async () => ({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }),
     } as Response);
 
     const authHelper = await electronProvider.getAuthHelper();
