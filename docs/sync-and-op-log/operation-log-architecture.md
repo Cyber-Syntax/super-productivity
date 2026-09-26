@@ -1039,6 +1039,13 @@ When local state is newer, we can't just reject the remote ops - that would caus
 
 A warning-level log is emitted: `OpLog.warn('LWW local wins - creating update op for ${entityType}:${entityId}')`
 
+When a replacement snapshot includes incoming task-time changes (including a
+subtask's contribution to its parent), project them in received order using the
+time reducers. Persist the incoming prefix before the replacement: moving only
+a timer delta ahead of an earlier absolute edit, removal, or rounding can lose
+tracked time or make parent totals differ between live state and restart replay.
+The replacement's clock must include every time operation it incorporates.
+
 ### Rejected Operations
 
 When operations are rejected (either local or remote):
@@ -1059,6 +1066,7 @@ When a `moveToArchive` operation conflicts with a field-level update (e.g., rena
 - **Restored tasks are never re-archived (#10220):** the archive is re-emitted scoped to the other tasks (`buildScopedArchiveReplacementOp()`, or dropped if none remain), and each restored top-level task gets a current-state LWW Update:
   - _own row conflicted_ — the update replaces the rejected `restoreTask` and resolves as a local win, overriding the concurrent remote edit regardless of timestamps (as in the partial-archive path of #9537);
   - _no row_ — the `restoreTask` stays pending and the update follows it to carry `isDone: false`, because other devices never saw the archive and ignore a restore of an active task.
+  - _subtasks_ — each live subtask without a row of its own in the batch gets a current-state update too, in both cases: a `restoreToToday` restore clears their schedule, which the rejected or ignored `restoreTask` does not carry.
 - **Known limitation:** that update is an ordinary pending op. A newer concurrent remote edit of the task arriving in a LATER sync beats it by whole-op LWW and both local ops are rejected, so other devices keep the task done while this one keeps `isDone: false` until `isDone` changes again — the pre-existing [composition residual](./conflict-journal-and-review.md#composition-residual-pre-existing-class) class.
 
 This is the **first level** of archive resurrection prevention. The **second level** is the [bulk archive filter](../../src/app/op-log/apply/bulk-archive-filter.util.ts), which pre-scans operation batches for archive operations and skips any LWW Update operations targeting entities being archived in the same batch. This two-level defense handles the 3+ client scenario where LWW Updates can arrive before or after archive ops in the same batch.
@@ -1078,8 +1086,11 @@ the websocket downloads one op per trigger, so an LWW Update that escaped level
 update recreates the task next to its archived copy. There is deliberately no
 receiver-side "is it in the archive?" guard: such a check cannot tell an update
 concurrent with the archive from a legitimate later re-introduction (a
-superseded `restoreTask` is re-emitted as a plain LWW Update), and skipping the
-latter diverges clients permanently. The fix is upstream — declare the full
+superseded `restoreTask` followed by later edits of the same task, or one from a
+released client, is re-emitted as a plain LWW Update — a sole one keeps its
+semantic type since #10196, with live task/subtask snapshots and no original
+`restoreToToday` instruction that could undo a later Planner move), and skipping
+the latter diverges clients permanently. The fix is upstream — declare the full
 footprint so level 1 never lets the update through. A pre-fix sender can still
 cause one visible, re-archivable resurrection during a mixed-fleet rollout.
 
