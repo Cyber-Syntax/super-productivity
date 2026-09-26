@@ -1257,8 +1257,8 @@ export class OperationLogStoreService implements RemoteOperationApplyStorePort<O
     batches: readonly MixedSourceOperationBatch[],
     options?: {
       rejectOpIds?: readonly string[];
-      archiveYoung?: unknown;
-      archiveOld?: unknown;
+      archiveYoung?: ArchiveStoreEntry['data'];
+      archiveOld?: ArchiveStoreEntry['data'];
     },
   ): Promise<{ written: MixedSourceWrittenOperation[]; skippedCount: number }> {
     const nonEmptyBatches = batches.filter((batch) => batch.ops.length > 0);
@@ -1378,7 +1378,7 @@ export class OperationLogStoreService implements RemoteOperationApplyStorePort<O
         }
         for (const [name, data] of archives) {
           if (data !== undefined) {
-            await tx.put(name, { id: SINGLETON_KEY, data });
+            await tx.put(name, { id: SINGLETON_KEY, data, lastModified: committedAt });
           }
         }
       });
@@ -2783,8 +2783,7 @@ export class OperationLogStoreService implements RemoteOperationApplyStorePort<O
       }
     }
 
-    // Foreign awaits must stay OUTSIDE the transaction (IDB auto-commits,
-    // SQLite would deadlock on the connection queue).
+    // Foreign awaits must stay OUTSIDE the transaction (IDB auto-commits).
     const currentClientId = await this.clientIdProvider.loadClientId();
     if (!currentClientId) {
       Log.warn(

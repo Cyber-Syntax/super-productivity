@@ -119,8 +119,9 @@ const isOrderAndContent = (order: Operation, edit: Operation): boolean => {
   }
 };
 
-// Admission still requires an exact commuting retained remote row; this list
-// only selects candidates for that existing fail-closed causal proof.
+// Admission still requires an exact commuting retained remote row (except
+// COUNTER_SET_TODAY, reissued without proof); this list only selects
+// candidates for that existing fail-closed causal proof.
 export const isReorderConflictOperation = (op: Operation): boolean =>
   isContentReorderOperation(op) ||
   [
@@ -153,8 +154,9 @@ export const projectReorderConflictAgainstState = (
       : actionPayload,
   });
   // Retain only the fields carried by the rejected edit, with their current
-  // values. Whole-entity LWW strips SimpleCounter.type and stamps modified;
-  // these idempotent updates preserve both content and unrelated state.
+  // values. Whole-entity LWW overwrites unrelated fields and stamps modified
+  // (and released clients strip SimpleCounter.type); these idempotent updates
+  // preserve both content and unrelated state.
   if (!isContentReorderOperation(operation)) {
     const id = operation.entityId!;
     let actionPayload: Record<string, unknown>;
