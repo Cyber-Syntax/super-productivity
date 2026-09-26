@@ -30,6 +30,7 @@ import {
   FILE_BASED_SYNC_CONSTANTS,
   SyncFileCompactOp,
 } from './file-based-sync.types';
+import { assertSyncFileVersion } from './assert-sync-file-version';
 import { OpLog } from '../../../core/log';
 import {
   DecompressError,
@@ -1587,12 +1588,11 @@ export class FileBasedSyncAdapterService {
           encryptKey,
           response.dataStr,
         );
-      if (data.version !== FILE_BASED_SYNC_CONSTANTS.SPLIT_FILE_VERSION) {
-        throw new SyncDataCorruptedError(
-          `Unsupported ops-file version: ${data.version} (expected ${FILE_BASED_SYNC_CONSTANTS.SPLIT_FILE_VERSION})`,
-          FILE_BASED_SYNC_CONSTANTS.OPS_FILE,
-        );
-      }
+      assertSyncFileVersion(
+        data,
+        FILE_BASED_SYNC_CONSTANTS.SPLIT_FILE_VERSION,
+        FILE_BASED_SYNC_CONSTANTS.OPS_FILE,
+      );
       return { data, rev: response.rev };
     } catch (decodeErr) {
       // Annotate the corrupt file's rev so the .bak recovery path can seed the
@@ -1619,12 +1619,7 @@ export class FileBasedSyncAdapterService {
         encryptKey,
         response.dataStr,
       );
-    if (data.version !== FILE_BASED_SYNC_CONSTANTS.SPLIT_FILE_VERSION) {
-      throw new SyncDataCorruptedError(
-        `Unsupported state-file version: ${data.version} (expected ${FILE_BASED_SYNC_CONSTANTS.SPLIT_FILE_VERSION})`,
-        path,
-      );
-    }
+    assertSyncFileVersion(data, FILE_BASED_SYNC_CONSTANTS.SPLIT_FILE_VERSION, path);
     return { data, rev: response.rev };
   }
 
@@ -1718,13 +1713,13 @@ export class FileBasedSyncAdapterService {
     try {
       current = await this._downloadStateFile(provider, cfg, encryptKey);
     } catch (e) {
-      // A plaintext primary while encryption is expected is a downgrade signal,
-      // not a missing/corrupt optional backup source. Let it abort compaction so
-      // the encrypted client cannot silently overwrite the remote state file.
-      if (e instanceof PlaintextWhenEncryptionExpectedError) {
+      // Never overwrite a newer state file or a plaintext encryption downgrade.
+      if (
+        e instanceof PlaintextWhenEncryptionExpectedError ||
+        (e instanceof SyncDataCorruptedError && e.isRemoteNewer)
+      ) {
         throw e;
       }
-      // Non-fatal — e.g. first compaction has no existing state file to back up.
       OpLog.normal('FileBasedSyncAdapter: state-file backup skipped (non-fatal)', e);
       return;
     }
@@ -1798,13 +1793,12 @@ export class FileBasedSyncAdapterService {
           'FileBasedSyncAdapter: immutable snapshot does not match snapshotRef; trying sync-state.json',
         );
       } catch (e) {
-        // Same rule as the fixed-file read below (GHSA-vrc7-775g-ggqc): the
-        // referenced immutable snapshot is a PRIMARY source, so a plaintext one
-        // is a downgrade signal, not ordinary corruption — surface it instead of
-        // silently falling through to sync-state.json. No legitimate flow leaves
-        // the REFERENCED gen snapshot plaintext while local encryption is on
-        // (a real disable rewrites the ops file too, which fails decode first).
-        if (e instanceof PlaintextWhenEncryptionExpectedError) {
+        // The referenced immutable snapshot is primary: do not adopt an older copy
+        // over a newer format or a plaintext encryption downgrade.
+        if (
+          e instanceof PlaintextWhenEncryptionExpectedError ||
+          (e instanceof SyncDataCorruptedError && e.isRemoteNewer)
+        ) {
           throw e;
         }
         OpLog.warn(
@@ -1820,10 +1814,11 @@ export class FileBasedSyncAdapterService {
         'FileBasedSyncAdapter: sync-state.json does not match snapshotRef; trying .bak',
       );
     } catch (e) {
-      // Do not treat a plaintext primary as ordinary corruption. Falling back to
-      // an encrypted .bak would hide the downgrade and hydrate data after the
-      // fail-closed decoder explicitly rejected the remote state file.
-      if (e instanceof PlaintextWhenEncryptionExpectedError) {
+      // Do not hide a newer format or an encryption downgrade behind an old .bak.
+      if (
+        e instanceof PlaintextWhenEncryptionExpectedError ||
+        (e instanceof SyncDataCorruptedError && e.isRemoteNewer)
+      ) {
         throw e;
       }
       OpLog.warn('FileBasedSyncAdapter: sync-state.json unreadable; trying .bak', e);
@@ -3105,7 +3100,7 @@ export class FileBasedSyncAdapterService {
    */
   private _isRecoverableCorruption(e: unknown): boolean {
     return (
-      e instanceof SyncDataCorruptedError ||
+      (e instanceof SyncDataCorruptedError && !e.isRemoteNewer) ||
       // Covers EmptyRemoteBodySPError (empty file) via its InvalidDataSPError base.
       e instanceof InvalidDataSPError ||
       e instanceof JsonParseError ||
@@ -3187,13 +3182,11 @@ export class FileBasedSyncAdapterService {
         throw new SplitSyncFormatDetectedError();
       }
 
-      // Validate file version
-      if (data.version !== FILE_BASED_SYNC_CONSTANTS.FILE_VERSION) {
-        throw new SyncDataCorruptedError(
-          `Unsupported file version: ${data.version} (expected ${FILE_BASED_SYNC_CONSTANTS.FILE_VERSION})`,
-          FILE_BASED_SYNC_CONSTANTS.SYNC_FILE,
-        );
-      }
+      assertSyncFileVersion(
+        data,
+        FILE_BASED_SYNC_CONSTANTS.FILE_VERSION,
+        FILE_BASED_SYNC_CONSTANTS.SYNC_FILE,
+      );
     } catch (decodeErr) {
       // A split tombstone is a valid signal, not corruption — let it propagate
       // by type without being annotated as a corrupt primary.
