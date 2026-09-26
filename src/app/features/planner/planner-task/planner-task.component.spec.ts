@@ -697,6 +697,8 @@ describe('PlannerTaskComponent', () => {
       const { fixture, component } = create(makeTask(), true);
       scope.appendChild(fixture.nativeElement);
       spyOn(add, 'focus');
+      fixture.nativeElement.focus();
+      expect(document.activeElement).toBe(fixture.nativeElement);
 
       component.onTaskShortcut(shortcutEvent('s'));
       fixture.nativeElement.remove();
