@@ -13,6 +13,7 @@ owners are:
 - `e2e/tests/sync/supersync-section-convergence.spec.ts`
 - `src/app/op-log/testing/integration/reorder-conflict-wedge.integration.spec.ts`
 - `e2e/tests/sync/supersync-reorder-conflict-wedge.spec.ts`
+- `e2e/tests/sync/supersync-issue-provider-reorder-conflict.spec.ts`
 
 ## Why generic entity LWW is insufficient
 
@@ -26,7 +27,7 @@ The resolver may therefore replay a rejected SECTION intent instead of
 collapsing it into a generic entity snapshot. This is a deliberately narrow
 exception, not permission to replay arbitrary rejected actions.
 
-Note, habit and board reorders also carry list writes that an entity snapshot
+Note, habit, board and issue-provider reorders also carry list writes that an entity snapshot
 cannot represent. When one crosses a supported content edit, both intents must
 survive. Applying the remote action alone does not resolve the server's rejection
 of the pending local clock.
@@ -40,6 +41,7 @@ Only these action families are candidates:
 - `SECTION_REMOVE_TASK`
 - `NOTE_UPDATE_ORDER`, `COUNTER_UPDATE_ORDER`, `BOARDS_SORT`
 - `NOTE_UPDATE`, `COUNTER_SET_TODAY`, `COUNTER_SET_FOR_DATE`, `BOARDS_UPDATE`, `SECTION_UPDATE`
+- `ISSUE_PROVIDER_SORT_FIRST`, `ISSUE_PROVIDER_UPDATE`
 
 `COUNTER_SET_TODAY` and `COUNTER_SET_FOR_DATE` are exceptions to the proof below;
 see the end of this section. For every other candidate, replay is admitted only
@@ -60,8 +62,17 @@ The recognized crossings are intentionally limited to:
   ordered sections;
 - a project or Today note reorder crossing a content/modified edit;
 - a habit reorder crossing a day's count update;
-- a board reorder crossing an identity-preserving board configuration update; and
-- a section reorder crossing a title edit.
+- a board reorder crossing an identity-preserving board configuration update;
+- a section reorder crossing a title edit; and
+- an issue-provider reorder crossing an identity-preserving settings update:
+  the payload and declared provider IDs agree, and the nonempty changes object
+  either omits `id` or keeps that ID. This includes full editor models and partial
+  updates such as pinned searches, regardless of provider kind.
+
+The unsorted provider adapter updates settings in place; only an ID change can
+change ordered membership. Identity-changing updates, deletions and competing
+reorders remain outside this exception. These checks establish commutativity;
+they do not replace normal operation or model validation.
 
 Note pinning/moving, habit configuration changes and competing reorders are not
 recognized as commuting content crossings. Missing, ambiguous, malformed or
@@ -102,6 +113,13 @@ hydration also replays rejected originals.
 Habit-grid edits retain `COUNTER_SET_FOR_DATE` and their original `date`, including
 when that date was today on the originating device.
 
+Issue-provider order replacements carry the complete current provider list:
+their sort-first reducer appends unlisted IDs, so retaining only the original
+footprint would move later additions. Current membership omits deleted providers;
+a deleted update target is superseded without recreating it. Provider updates
+use the existing retained-evidence proof and fallback, without the habit-count
+exception for missing proof.
+
 Replacement ordering is scoped by owner list, work-context task order or content
 action/entity (and day for habit counts).
 Replacements use a merged, incremented clock that dominates the rejected and
@@ -130,6 +148,12 @@ histories consumed by unmodified v19.1.0. Older clients that resolve first retai
 their original safety gate; see the [S2 validation report](../plans/2026-09-26-sync-S2-result.md)
 and [dated-habit result](../plans/2026-09-26-sync-habit-date-reorder-result.md)
 for released-asset provenance and the tested limits.
+
+The provider suite checks both GitLab and Jira replacement histories against
+unmodified v19.1.0 assets, including restart and the rendered tab order. If that
+released client encounters the conflict first, it still stops with pending work intact;
+the new resolver cannot change old-client behavior. See the
+[provider fix validation](../plans/2026-09-26-sync-issue-provider-reorder-reproduction.md#provider-independent-recovery).
 
 ## Verification
 

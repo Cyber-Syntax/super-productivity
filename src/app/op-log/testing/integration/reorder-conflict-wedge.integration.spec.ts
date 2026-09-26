@@ -2,6 +2,17 @@ import { TestBed } from '@angular/core/testing';
 import { Action, ActionReducer, provideStore, Store } from '@ngrx/store';
 import { firstValueFrom } from 'rxjs';
 import { SnackService } from '../../../core/snack/snack.service';
+import {
+  IssueProvider,
+  IssueProviderGithub,
+  IssueProviderGitlab,
+  IssueProviderState,
+} from '../../../features/issue/issue.model';
+import { IssueProviderActions } from '../../../features/issue/store/issue-provider.actions';
+import {
+  issueProviderReducer,
+  issueProviderInitialState,
+} from '../../../features/issue/store/issue-provider.reducer';
 import { BoardsActions } from '../../../features/boards/store/boards.actions';
 import {
   boardsReducer,
@@ -46,6 +57,7 @@ import { WorkContextType } from '../../../features/work-context/work-context.mod
 import { createBaseState } from '../../../root-store/meta/task-shared-meta-reducers/test-utils';
 import { lwwUpdateMetaReducer } from '../../../root-store/meta/task-shared-meta-reducers/lww-update.meta-reducer';
 import { RootState } from '../../../root-store/root-state';
+import { TaskSharedActions } from '../../../root-store/meta/task-shared.actions';
 import { loadAllData } from '../../../root-store/meta/load-all-data.action';
 import { AppDataComplete } from '../../model/model-config';
 import { OperationApplierService } from '../../apply/operation-applier.service';
@@ -55,7 +67,12 @@ import { StateSnapshotService } from '../../backup/state-snapshot.service';
 import { OperationCaptureService } from '../../capture/operation-capture.service';
 import { OperationLogEffects } from '../../capture/operation-log.effects';
 import { buildEntityRegistry, ENTITY_REGISTRY } from '../../core/entity-registry';
-import { ActionType, extractActionPayload, Operation } from '../../core/operation.types';
+import {
+  ActionType,
+  extractActionPayload,
+  Operation,
+  OpType,
+} from '../../core/operation.types';
 import { UnsupportedMultiEntityConflictError } from '../../core/errors/sync-errors';
 import { PersistentAction } from '../../core/persistent-action.interface';
 import { OperationLogStoreService } from '../../persistence/operation-log-store.service';
@@ -69,7 +86,12 @@ import {
   VectorClockComparison,
 } from '../../../core/util/vector-clock';
 
-type TestState = RootState & { section: SectionState; simpleCounter: SimpleCounterState };
+const actionPayloadOf = (op: Operation): unknown => extractActionPayload(op.payload);
+type TestState = RootState & {
+  section: SectionState;
+  simpleCounter: SimpleCounterState;
+  issueProvider: IssueProviderState;
+};
 const IDS = ['a', 'b', 'untouched'];
 const PROJECT = 'project1';
 const EDIT_DATE = '2026-09-23';
@@ -81,8 +103,41 @@ const families = [
   'habit date counts',
   'boards',
   'sections',
+  'issue providers',
 ] as const;
 type Family = (typeof families)[number];
+// The Enabled switch submits this full 18-field GitLab model, not a flag delta.
+const provider = (id: string): IssueProviderGitlab => ({
+  id,
+  issueProviderKey: 'GITLAB',
+  isEnabled: id !== 'untouched',
+  isAutoPoll: false,
+  isAutoAddToBacklog: false,
+  isIntegratedAddTaskBar: false,
+  defaultProjectId: PROJECT,
+  pinnedSearch: null,
+  pollingMode: 'whenProjectOpen',
+  defaultTagIds: [],
+  defaultNote: 'Synthetic note',
+  project: 'synthetic/provider',
+  gitlabBaseUrl: 'https://issues.example.invalid/',
+  token: 'synthetic-only-not-a-credential',
+  filterUsername: 'synthetic-user',
+  scope: 'all',
+  filter: 'state=opened',
+  isEnableTimeTracking: false,
+});
+const pluginProvider: IssueProviderGithub = {
+  id: IDS[0],
+  issueProviderKey: 'GITHUB',
+  isEnabled: true,
+  pluginId: 'github-issue-provider',
+  pluginConfig: {
+    repo: 'synthetic/provider',
+    token: 'synthetic-only-not-a-credential',
+    twoWaySync: { title: 'off', isDone: 'off' },
+  },
+};
 
 const actionsFor = (
   family: Family,
@@ -113,6 +168,18 @@ const actionsFor = (
       edit: BoardsActions.updateBoard({
         id: IDS[0],
         updates: { id: IDS[0], title: 'preserved content', cols: 3, panels: [] },
+      }),
+    };
+  if (family === 'issue providers')
+    return {
+      order: IssueProviderActions.sortIssueProvidersFirst({
+        ids: [IDS[1], IDS[0], IDS[2]],
+      }),
+      edit: IssueProviderActions.updateIssueProvider({
+        issueProvider: {
+          id: IDS[0],
+          changes: { ...provider(IDS[0]), isEnabled: false },
+        },
       }),
     };
   return {
@@ -147,7 +214,7 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
         entityType: meta.entityType,
         opType: meta.opType,
         entityId: meta.entityId ?? meta.entityIds![0],
-        entityIds: meta.entityIds,
+        entityIds: meta.entityIds ?? (meta.entityId ? [meta.entityId] : undefined),
         payload: {
           actionPayload,
           entityChanges: TestBed.inject(OperationCaptureService).extractEntityChanges(
@@ -167,6 +234,7 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
       boards: initialBoardsState,
       section: initialSectionState,
       simpleCounter: initialSimpleCounterState,
+      issueProvider: issueProviderInitialState,
     };
     const featureReducer: ActionReducer<TestState> = (s = initial, a: Action) => ({
       ...s,
@@ -175,6 +243,7 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
       boards: boardsReducer(s.boards, a),
       section: sectionReducer(s.section, a),
       simpleCounter: simpleCounterReducer(s.simpleCounter, a),
+      issueProvider: issueProviderReducer(s.issueProvider, a),
     });
     reducer = bulkOperationsMetaReducer(lwwUpdateMetaReducer(featureReducer));
     for (const id of [...IDS].reverse()) {
@@ -212,6 +281,7 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
             taskIds: [],
           },
         }),
+        IssueProviderActions.addIssueProvider({ issueProvider: provider(id) }),
       ])
         initial = reducer(initial, a);
     }
@@ -266,6 +336,7 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
             boards: boardsReducer,
             section: sectionReducer,
             simpleCounter: simpleCounterReducer,
+            issueProvider: issueProviderReducer,
           },
           {
             initialState: initial,
@@ -321,7 +392,12 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
     TestBed.resetTestingModule();
   });
 
-  for (const unsupported of [
+  const unsupportedCrossings: {
+    name: string;
+    family: Family;
+    edit: PersistentAction;
+    mutate?: (op: Operation) => Operation;
+  }[] = [
     {
       name: 'note pinning',
       family: 'project notes' as const,
@@ -370,11 +446,74 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
       family: 'habits' as const,
       edit: syncSimpleCounterTime({ id: IDS[0], date: EDIT_DATE, duration: 1000 }),
     },
-  ]) {
+    ...[
+      { name: 'provider identity change', changes: { id: 'renamed' } },
+      { name: 'provider undefined identity', changes: { id: undefined } },
+    ].map(({ name, changes }) => ({
+      name,
+      family: 'issue providers' as const,
+      edit: IssueProviderActions.updateIssueProvider({
+        issueProvider: { id: IDS[0], changes: { ...provider(IDS[0]), ...changes } },
+      }),
+    })),
+    {
+      name: 'competing provider order',
+      family: 'issue providers',
+      edit: IssueProviderActions.sortIssueProvidersFirst({ ids: [...IDS].reverse() }),
+    },
+    {
+      name: 'provider deletion',
+      family: 'issue providers',
+      edit: TaskSharedActions.deleteIssueProvider({
+        issueProviderId: IDS[0],
+        taskIdsToUnlink: [],
+      }),
+    },
+    ...[
+      ...[undefined, null, ['invalid'], 'invalid', {}].map((changes) => ({
+        name: 'provider malformed changes ' + JSON.stringify(changes),
+        mutate: (op: Operation): Operation => ({
+          ...op,
+          payload: {
+            actionPayload: {
+              issueProvider: {
+                id: IDS[0],
+                changes,
+              },
+            },
+            entityChanges: [],
+          },
+        }),
+      })),
+      {
+        name: 'provider plural update footprint',
+        mutate: (op: Operation): Operation => ({ ...op, entityIds: [...IDS] }),
+      },
+      {
+        name: 'provider update with move metadata',
+        mutate: (op: Operation): Operation => ({ ...op, opType: OpType.Move }),
+      },
+      {
+        name: 'provider wrapper identity mismatch',
+        mutate: (op: Operation): Operation => ({
+          ...op,
+          entityId: IDS[1],
+          entityIds: [IDS[1]],
+        }),
+      },
+    ].map(({ name, mutate }) => ({
+      name,
+      family: 'issue providers' as const,
+      edit: actionsFor('issue providers').edit,
+      mutate,
+    })),
+  ];
+  for (const unsupported of unsupportedCrossings) {
     it('keeps the safety stop for ' + unsupported.name, async () => {
       const localAction = actionsFor(unsupported.family).order;
       const local = capture(localAction, 'local', 1000);
-      const remote = capture(unsupported.edit as PersistentAction, 'remote', 2000);
+      const captured = capture(unsupported.edit, 'remote', 2000);
+      const remote = unsupported.mutate ? unsupported.mutate(captured) : captured;
       store.dispatch(localAction);
       await db.append(local, 'local');
       const before = await state();
@@ -495,6 +634,94 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
       expect((await state()).simpleCounter).toEqual(converged.simpleCounter);
     }
   });
+
+  for (const pending of ['order', 'settings', 'deleted settings'] as const) {
+    it(
+      'issue providers: projects ' + pending + ' against later durable changes',
+      async () => {
+        const pair = actionsFor('issue providers');
+        const pendingContent = pending !== 'order';
+        const localAction = pendingContent ? pair.edit : pair.order;
+        const local = capture(localAction, 'local', 1000);
+        const remote = capture(pendingContent ? pair.order : pair.edit, 'remote', 2000);
+        store.dispatch(localAction);
+        await db.append(local, 'local');
+        await TestBed.inject(ConflictResolutionService).autoResolveConflictsLWW(
+          [],
+          [remote],
+        );
+
+        const deletedId = pending === 'settings' ? IDS[2] : IDS[0];
+        const currentIds = ['new-provider', ...IDS.filter((id) => id !== deletedId)];
+        const laterActions = [
+          TaskSharedActions.deleteIssueProvider({
+            issueProviderId: deletedId,
+            taskIdsToUnlink: [],
+          }),
+          IssueProviderActions.addIssueProvider({
+            issueProvider: provider('new-provider'),
+          }),
+          IssueProviderActions.sortIssueProvidersFirst({ ids: currentIds }),
+          ...(pending === 'settings'
+            ? [
+                IssueProviderActions.updateIssueProvider({
+                  issueProvider: {
+                    id: IDS[0],
+                    changes: {
+                      isEnabled: true,
+                      filter: 'state=closed',
+                      migratedFromProjectId: 'later-project',
+                    },
+                  },
+                }),
+              ]
+            : []),
+        ];
+        const successors: Operation[] = [];
+        for (const [index, action] of laterActions.entries()) {
+          const op = {
+            ...capture(action, 'local', 3000 + index),
+            vectorClock: { ...remote.vectorClock, local: index + 2 },
+          };
+          store.dispatch(action);
+          await db.append(op, 'local');
+          successors.push(op);
+        }
+        const before = await state();
+        const created = await TestBed.inject(
+          SupersededOperationResolverService,
+        ).resolveSupersededLocalOps([
+          { opId: local.id, op: local, existingClock: remote.vectorClock },
+        ]);
+        const replacements = (await db.getUnsynced())
+          .map((row) => row.op)
+          .filter((op) => !successors.some((successor) => successor.id === op.id));
+        expect(created).toBe(pending === 'deleted settings' ? 0 : 1);
+        expect(replacements.length).toBe(created);
+        expect((await db.getOpById(local.id))?.rejectedAt).toBeDefined();
+        expect(await state()).toEqual(before);
+        if (pending === 'order') {
+          expect(actionPayloadOf(replacements[0])).toEqual({ ids: currentIds });
+          expect(replacements[0].entityIds).toEqual(currentIds);
+        } else if (pending === 'settings') {
+          expect(actionPayloadOf(replacements[0])).toEqual({
+            issueProvider: {
+              id: IDS[0],
+              changes: { ...provider(IDS[0]), isEnabled: true, filter: 'state=closed' },
+            },
+          });
+        }
+        const applier = TestBed.inject(OperationApplierService);
+        const durable = (await db.getOpsAfterSeq(0)).map((row) => row.op);
+        for (const history of [durable, [remote, ...successors, ...replacements]]) {
+          resetProjection(initial);
+          await applier.applyOperations(history, { isLocalHydration: true });
+          expect((await state()).issueProvider).toEqual(before.issueProvider);
+          expect((await state()).issueProvider.entities[deletedId]).toBeUndefined();
+        }
+      },
+    );
+  }
 
   for (const family of families) {
     for (const pendingContent of family.startsWith('habit') ? [false, true] : [false]) {
@@ -622,18 +849,68 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
         expect(await state()).toEqual(before);
       });
     }
+  }
 
+  const convergenceCases: {
+    family: Family;
+    name: string;
+    seed?: IssueProvider;
+    changes?: Partial<IssueProvider>;
+  }[] = [
+    ...families.map((family) => ({ family, name: family })),
+    {
+      family: 'issue providers',
+      name: 'issue providers: partial pinned search',
+      changes: { pinnedSearch: 'assigned to me' },
+    },
+    {
+      family: 'issue providers',
+      name: 'issue providers: optional settings field',
+      changes: { ...provider(IDS[0]), migratedFromProjectId: PROJECT },
+    },
+    {
+      family: 'issue providers',
+      name: 'issue providers: nested plugin settings',
+      seed: pluginProvider,
+      changes: {
+        ...pluginProvider,
+        pluginConfig: {
+          ...pluginProvider.pluginConfig,
+          twoWaySync: { title: 'pullOnly', isDone: 'off' },
+        },
+      },
+    },
+  ];
+  for (const scenario of convergenceCases) {
     for (const remoteReorder of [false, true]) {
       for (const remoteNewer of [false, true]) {
         it(
-          family +
+          scenario.name +
             ': ' +
             (remoteReorder ? 'remote' : 'local') +
             ' reorder, ' +
             (remoteNewer ? 'remote' : 'local') +
             ' timestamp wins',
           async () => {
-            const pair = actionsFor(family);
+            if (scenario.seed) {
+              initial = {
+                ...initial,
+                issueProvider: {
+                  ...initial.issueProvider,
+                  entities: {
+                    ...initial.issueProvider.entities,
+                    [scenario.seed.id]: scenario.seed,
+                  },
+                },
+              };
+              resetProjection(initial);
+            }
+            const pair = actionsFor(scenario.family);
+            if (scenario.changes) {
+              pair.edit = IssueProviderActions.updateIssueProvider({
+                issueProvider: { id: IDS[0], changes: scenario.changes },
+              });
+            }
             const localAction = (
               remoteReorder ? pair.edit : pair.order
             ) as PersistentAction;
@@ -673,7 +950,7 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
             const replacements = (await db.getUnsynced()).map((entry) => entry.op);
             expect(replacements.length).toBe(1);
             expect((await db.getOpById(local.id))?.rejectedAt).toBeDefined();
-            if (family === 'habit date counts') {
+            if (scenario.family === 'habit date counts') {
               expect((remoteReorder ? local : remote).actionType).toBe(
                 ActionType.COUNTER_SET_FOR_DATE,
               );
@@ -697,9 +974,10 @@ describe('reorder conflicts: real store, applier, reducers and durable replay (#
               boards: s.boards,
               section: s.section,
               simpleCounter: s.simpleCounter,
+              issueProvider: s.issueProvider,
             });
             expect(projection(converged)).toEqual(projection(expected));
-            if (family === 'habit date counts') {
+            if (scenario.family === 'habit date counts') {
               const habit = converged.simpleCounter.entities[IDS[0]]!;
               expect(habit.countOnDay).toEqual({ [EDIT_DATE]: 3, [OTHER_DATE]: 7 });
               expect(habit.type).toBe(SimpleCounterType.StopWatch);
