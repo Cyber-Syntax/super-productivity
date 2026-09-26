@@ -969,7 +969,7 @@ END:VCALENDAR`;
         expect(events.length).toBe(52);
       });
 
-      it('keeps an in-progress event visible (rangeStart anchored to UTC midnight)', async () => {
+      it('keeps an in-progress event visible (rangeStart anchored to start of day)', async () => {
         // Pin "now" to mid-morning so a 09:00 → 10:00 meeting is in progress.
         vi.setSystemTime(new Date('2026-01-15T09:30:00Z'));
 
@@ -1099,6 +1099,126 @@ END:VCALENDAR</cal:calendar-data>
         } as any);
         expect(link).toContain('event::1234567890123');
       });
+    });
+
+    // Follow-up to #10200: the REPORT window (and the client-side occurrence
+    // filter) started at UTC midnight, so outside UTC an event from earlier in
+    // the user's local day dropped out mid-day. The window must start at the
+    // user's LOCAL start of day (or 2h ago, if earlier). Each case pins TZ for
+    // this process, so the result is the same on CI (UTC) and locally.
+    describe('query window start (time-range)', () => {
+      afterEach(() => {
+        vi.useRealTimers();
+        vi.unstubAllEnvs();
+      });
+
+      const toIcal = (iso: string): string =>
+        iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+      it.each([
+        {
+          label: 'UTC: 15:00-16:00 meeting, polled at 16:05',
+          tz: 'UTC',
+          offsetMin: 0,
+          now: '2026-05-14T16:05:00Z',
+          eventStart: '2026-05-14T15:00:00Z',
+          eventEnd: '2026-05-14T16:00:00Z',
+          expectedStart: '20260514T000000Z',
+        },
+        {
+          // UTC midnight equals the event's end, so a UTC anchor drops it.
+          label: 'America/Los_Angeles: 16:00-17:00 meeting, polled at 17:01',
+          tz: 'America/Los_Angeles',
+          offsetMin: 420,
+          now: '2026-05-15T00:01:00Z',
+          eventStart: '2026-05-14T23:00:00Z',
+          eventEnd: '2026-05-15T00:00:00Z',
+          expectedStart: '20260514T070000Z',
+        },
+        {
+          // The meeting is still running, but it started before UTC midnight.
+          label: 'America/Los_Angeles: 16:30-17:30 meeting in progress, polled at 17:01',
+          tz: 'America/Los_Angeles',
+          offsetMin: 420,
+          now: '2026-05-15T00:01:00Z',
+          eventStart: '2026-05-14T23:30:00Z',
+          eventEnd: '2026-05-15T00:30:00Z',
+          expectedStart: '20260514T070000Z',
+        },
+        {
+          // UTC midnight falls between the event's end and the poll.
+          label: 'Australia/Brisbane: 08:00-09:00 meeting, polled at 10:01',
+          tz: 'Australia/Brisbane',
+          offsetMin: -600,
+          now: '2026-05-15T00:01:00Z',
+          eventStart: '2026-05-14T22:00:00Z',
+          eventEnd: '2026-05-14T23:00:00Z',
+          expectedStart: '20260514T140000Z',
+        },
+        {
+          // Local midnight is after the event's start; the 2h lookback keeps it.
+          label: 'America/Los_Angeles: 23:00-23:30 meeting, polled at 00:30 next day',
+          tz: 'America/Los_Angeles',
+          offsetMin: 420,
+          now: '2026-05-15T07:30:00Z',
+          eventStart: '2026-05-15T06:00:00Z',
+          eventEnd: '2026-05-15T06:30:00Z',
+          expectedStart: '20260515T053000Z',
+        },
+      ])(
+        'keeps an event from earlier: $label',
+        async ({ tz, offsetMin, now, eventStart, eventEnd, expectedStart }) => {
+          vi.stubEnv('TZ', tz);
+          vi.useFakeTimers();
+          vi.setSystemTime(new Date(now));
+          // Guard: fail loudly if the runtime ignored the TZ override.
+          expect(new Date(now).getTimezoneOffset()).toBe(offsetMin);
+          const ics = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:earlier-uid
+DTSTART:${toIcal(eventStart)}
+DTEND:${toIcal(eventEnd)}
+SUMMARY:Earlier Meeting
+END:VEVENT
+END:VCALENDAR`;
+          const mockHttp = {
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            patch: vi.fn(),
+            delete: vi.fn(),
+            request: vi.fn().mockResolvedValue(`<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+  <d:response>
+    <d:href>/remote.php/dav/calendars/admin/personal/earlier.ics</d:href>
+    <d:propstat>
+      <d:prop>
+        <d:getetag>"e1"</d:getetag>
+        <cal:calendar-data>${ics}</cal:calendar-data>
+      </d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>`),
+          };
+
+          const events = await definition.getNewIssuesForBacklog!(
+            {
+              serverUrl: 'https://example.com/dav',
+              username: 'admin',
+              password: 'pass',
+              readCalendarIds: ['/remote.php/dav/calendars/admin/personal/'],
+              syncRangeWeeks: '2',
+            } as any,
+            mockHttp as any,
+          );
+
+          expect(events.map((e) => e.title)).toEqual(['Earlier Meeting']);
+          const body = mockHttp.request.mock.calls[0][2] as string;
+          expect(body).toContain(`<c:time-range start="${expectedStart}"`);
+        },
+      );
     });
   });
 

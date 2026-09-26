@@ -1074,6 +1074,9 @@ const expandIcalToSearchResults = (
   return out;
 };
 
+/** Minimum lookback for the read window, like the iCal provider's START_OFFSET. */
+const LOOKBACK_MS = 2 * 60 * 60 * 1000;
+
 /** Fetch events from a single calendar via REPORT */
 const fetchEventsForCalendar = async (
   http: PluginHttp,
@@ -1082,15 +1085,18 @@ const fetchEventsForCalendar = async (
 ): Promise<PluginSearchResult[]> => {
   const syncRangeWeeks = Math.max(parseInt(cfg.syncRangeWeeks || '', 10) || 2, 1);
   const now = new Date();
-  // Anchor the window to start-of-today (UTC) so events already in progress
-  // earlier on the same day stay visible. Using `now` as the lower bound would
-  // hide an ongoing meeting. UTC anchor keeps the math timezone-independent.
-  const rangeStartMs = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-  const rangeEndMs = rangeStartMs + syncRangeWeeks * 7 * 24 * 60 * 60 * 1000;
+  // Start the window at the user's LOCAL start of day, so events that started
+  // earlier today (including one still in progress) stay visible, or
+  // LOOKBACK_MS ago if that is earlier, so a late-evening event is still shown
+  // just after midnight. A UTC-midnight anchor dropped them mid-day for anyone
+  // outside UTC (e.g. at 17:00 in Los Angeles).
+  const localStartOfDayMs = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const rangeStartMs = Math.min(localStartOfDayMs, now.getTime() - LOOKBACK_MS);
+  const rangeEndMs = now.getTime() + syncRangeWeeks * 7 * 24 * 60 * 60 * 1000;
   const start = toIcalUtcDateTime(new Date(rangeStartMs));
   const end = toIcalUtcDateTime(new Date(rangeEndMs));
 
