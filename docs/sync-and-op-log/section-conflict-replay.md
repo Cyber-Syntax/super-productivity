@@ -39,11 +39,11 @@ Only these action families are candidates:
 - `SECTION_ADD_TASK`
 - `SECTION_REMOVE_TASK`
 - `NOTE_UPDATE_ORDER`, `COUNTER_UPDATE_ORDER`, `BOARDS_SORT`
-- `NOTE_UPDATE`, `COUNTER_SET_TODAY`, `BOARDS_UPDATE`, `SECTION_UPDATE`
+- `NOTE_UPDATE`, `COUNTER_SET_TODAY`, `COUNTER_SET_FOR_DATE`, `BOARDS_UPDATE`, `SECTION_UPDATE`
 
-`COUNTER_SET_TODAY` is the one exception to the proof below; see the end of
-this section. For every other candidate, replay is admitted only when all of
-the following hold:
+`COUNTER_SET_TODAY` and `COUNTER_SET_FOR_DATE` are exceptions to the proof below;
+see the end of this section. For every other candidate, replay is admitted only
+when all of the following hold:
 
 1. The rejected operation has an existing entity frontier concurrent with its clock.
 2. Exactly one retained operation matches the affected entity/clock frontier.
@@ -68,10 +68,10 @@ recognized as commuting content crossings. Missing, ambiguous, malformed or
 non-commuting evidence does not admit replay. Recognized content reorders
 (including section reorders) then remain pending with
 `UnsupportedMultiEntityConflictError`: generic entity LWW loses list writes.
-`COUNTER_SET_TODAY` needs no causal proof: it is always reissued with the
-day's current count (a local no-op), because a whole-habit LWW snapshot
-overwrites unrelated fields (released receivers also drop the habit's type) and
-stopping sync would block every habit click. Other actions
+`COUNTER_SET_TODAY` and `COUNTER_SET_FOR_DATE` need no causal proof: each is
+reissued with its original day's current count (a local no-op), because a
+whole-habit LWW snapshot overwrites unrelated fields (released receivers also
+drop the habit's type) and stopping sync would block habit clicks. Other actions
 retain their existing fallback. Never broaden recognition merely because two
 actions appear harmless in one fixture.
 
@@ -99,6 +99,8 @@ and avoiding conflicts with disabled habits absent from the original drag.
 Content replacements carry only the originally changed fields with their
 current values. These replacements are local no-ops and remain idempotent when
 hydration also replays rejected originals.
+Habit-grid edits retain `COUNTER_SET_FOR_DATE` and their original `date`, including
+when that date was today on the originating device.
 
 Replacement ordering is scoped by owner list, work-context task order or content
 action/entity (and day for habit counts).
@@ -123,9 +125,10 @@ the replacement payload must be checked against the released-fleet rules in
 [`operation-log-architecture.md`](./operation-log-architecture.md#bump-policy--a-bump-does-not-protect-the-released-fleet).
 
 Content reorder recovery reuses existing action payloads without a schema or
-persisted-model change. Its E2E covers both note resolution histories consumed
-by unmodified v19.1.0. Older clients that resolve first retain their original
-safety gate; see the [S2 validation report](../plans/2026-09-26-sync-S2-result.md)
+persisted-model change. Its E2E covers both note and dated-habit resolution
+histories consumed by unmodified v19.1.0. Older clients that resolve first retain
+their original safety gate; see the [S2 validation report](../plans/2026-09-26-sync-S2-result.md)
+and [dated-habit result](../plans/2026-09-26-sync-habit-date-reorder-result.md)
 for released-asset provenance and the tested limits.
 
 ## Verification

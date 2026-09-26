@@ -345,7 +345,7 @@ export class SupersededOperationResolverService {
       // against one stable live-state frontier so anchors and every later local
       // successor are represented without an action-family allowlist. A recognized
       // reorder without this proof must stay pending: entity LWW cannot carry it.
-      // COUNTER_SET_TODAY is projected without the proof (see below).
+      // Absolute habit counts are projected without the proof (see below).
       const regularSupersededOps: SupersededOperation[] = [];
       let sectionReplayContext: SectionCausalReplayContext | undefined;
       let sectionReplaySnapshot: ReorderReplaySnapshot | undefined;
@@ -353,19 +353,21 @@ export class SupersededOperationResolverService {
         let projectedSectionOp: Operation | undefined;
         let projectedWorkContextState: WorkContextStateProjection | undefined;
         let projectedOrder: SectionReplayOrder | undefined;
-        // An absolute counter-today set needs no causal proof: reissuing its
+        // An absolute dated count needs no causal proof: reissuing its
         // current value is a local no-op and, unlike a whole-habit LWW snapshot,
         // leaves every other field (and released receivers' SimpleCounter.type)
         // alone. Stopping sync for it would block habit clicks.
-        const isCounterSetToday = item.op.actionType === ActionType.COUNTER_SET_TODAY;
+        const isCounterSet =
+          item.op.actionType === ActionType.COUNTER_SET_TODAY ||
+          item.op.actionType === ActionType.COUNTER_SET_FOR_DATE;
         if (
-          isCounterSetToday ||
+          isCounterSet ||
           ((CAUSALLY_REPLAYABLE_SECTION_ACTIONS.has(item.op.actionType) ||
             isReorderConflictOperation(item.op)) &&
             item.existingClock)
         ) {
           let replayDecision: SectionCausalReplayDecision = 'replay';
-          if (!isCounterSetToday) {
+          if (!isCounterSet) {
             sectionReplayContext ??= buildSectionCausalReplayContext(
               await this.opLogStore.getOpsAfterSeq(0),
             );

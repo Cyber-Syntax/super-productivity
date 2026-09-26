@@ -89,10 +89,13 @@ const isOrderAndContent = (order: Operation, edit: Operation): boolean => {
       );
     }
     case ActionType.COUNTER_SET_TODAY:
+    case ActionType.COUNTER_SET_FOR_DATE:
       return (
         order.entityType === 'SIMPLE_COUNTER' &&
         p?.['id'] === edit.entityId &&
-        typeof p['today'] === 'string' &&
+        typeof p[
+          edit.actionType === ActionType.COUNTER_SET_FOR_DATE ? 'date' : 'today'
+        ] === 'string' &&
         typeof p['newVal'] === 'number'
       );
     case ActionType.BOARDS_UPDATE: {
@@ -120,13 +123,14 @@ const isOrderAndContent = (order: Operation, edit: Operation): boolean => {
 };
 
 // Admission still requires an exact commuting retained remote row (except
-// COUNTER_SET_TODAY, reissued without proof); this list only selects
+// absolute habit counts, reissued without proof); this list only selects
 // candidates for that existing fail-closed causal proof.
 export const isReorderConflictOperation = (op: Operation): boolean =>
   isContentReorderOperation(op) ||
   [
     ActionType.NOTE_UPDATE,
     ActionType.COUNTER_SET_TODAY,
+    ActionType.COUNTER_SET_FOR_DATE,
     ActionType.BOARDS_UPDATE,
     ActionType.SECTION_UPDATE,
   ].includes(op.actionType);
@@ -159,11 +163,16 @@ export const projectReorderConflictAgainstState = (
   // preserve both content and unrelated state.
   if (!isContentReorderOperation(operation)) {
     const id = operation.entityId!;
+    const countDate =
+      p[operation.actionType === ActionType.COUNTER_SET_FOR_DATE ? 'date' : 'today'];
     let actionPayload: Record<string, unknown>;
-    if (operation.actionType === ActionType.COUNTER_SET_TODAY) {
+    if (
+      operation.actionType === ActionType.COUNTER_SET_TODAY ||
+      operation.actionType === ActionType.COUNTER_SET_FOR_DATE
+    ) {
       const entity = snapshot.simpleCounter.entities[id];
       if (!entity) return { kind: 'superseded' };
-      actionPayload = { ...p, newVal: entity.countOnDay[p['today'] as string] ?? 0 };
+      actionPayload = { ...p, newVal: entity.countOnDay[countDate as string] ?? 0 };
     } else {
       const key =
         operation.entityType === 'NOTE'
@@ -192,7 +201,7 @@ export const projectReorderConflictAgainstState = (
       kind: 'replay',
       operation: withPayload(actionPayload),
       order: {
-        scope: JSON.stringify([operation.actionType, id, p['today']]),
+        scope: JSON.stringify([operation.actionType, id, countDate]),
         position: 0,
       },
     };
