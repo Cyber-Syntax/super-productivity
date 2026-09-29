@@ -1310,12 +1310,17 @@ and
 
 ### Compaction Trigger Coordination
 
-The 500-ops compaction trigger uses a persistent counter stored in `state_cache.compactionCounter`:
+The 500-ops compaction trigger (`COMPACTION_THRESHOLD`) counts in memory, in
+`OperationLogEffects`:
 
-- Each atomic append increments the durable counter
-- Counter persists across app restarts
-- Counter is reset after successful compaction
-- The in-memory mirror avoids an IndexedDB read on every threshold check
+- Each local operation write increments the counter; at the threshold a
+  background compaction starts
+- The counter resets after a compaction that ran; it does not survive a restart
+- Across restarts, the hydrator's startup check (`compactIfBloated()`) compacts
+  once per boot when the log holds more than `STARTUP_COMPACTION_OP_THRESHOLD`
+  ops, some of them synced
+- Nothing increments `state_cache.compactionCounter` any more: it only seeds the
+  in-memory counter (in practice 0), and compaction resets it
 
 ### Device Identity and Legacy Data
 

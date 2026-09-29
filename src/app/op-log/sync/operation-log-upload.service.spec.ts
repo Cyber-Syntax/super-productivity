@@ -1715,8 +1715,8 @@ describe('OperationLogUploadService', () => {
        * FIX VERIFIED: uploadSnapshot now receives op.id to prevent ID mismatch
        *
        * BACKGROUND: Previously uploadSnapshot() was called WITHOUT the client's op.id.
-       * The server would generate its own ID, causing filterNewOps() to not recognize
-       * the server's operation as the same one the client uploaded. This caused data
+       * The server would generate its own ID, causing the applied-op-ID filter to not
+       * recognize the server's operation as the same one the client uploaded. This caused data
        * loss when the old state was re-applied.
        *
        * FIX: op.id is now passed as the 7th argument to uploadSnapshot.
