@@ -487,6 +487,19 @@ await expect(page.locator('task')).toHaveCount(3);
 // Avoid fixed timeouts
 await page.waitForTimeout(1000); // BAD
 await waitForAngularStability(page); // GOOD
+
+// Read a list in ONE snapshot. `count()` + `nth(i).innerText()` re-resolves and
+// auto-waits per row, so a re-render in between (a sync applying ops, the route
+// animation that keeps the leaving view mounted for ~225ms) waits out the whole
+// timeout on a row that no longer exists
+const count = await titles.count(); // BAD: then titles.nth(i).innerText() per row
+const all = await titles.allInnerTexts(); // GOOD
+
+// Wait for the FINAL state of a multi-step update, not for "it exists". Short syntax
+// can create the task with the raw title and a default due day first and rewrite both
+// in a second action, so "the task exists" or "it has some due day" are both true
+// before it is applied
+await expect.poll(() => readTaskTitle(page)).toBe('Cleaned title');
 ```
 
 ---

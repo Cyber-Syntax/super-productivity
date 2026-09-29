@@ -972,18 +972,22 @@ export const getTaskCount = async (client: SimulatedE2EClient): Promise<number> 
  * Get all task titles as an array.
  * Useful for comparing task order between clients.
  *
+ * Reads every row in one in-page evaluation. `count()` followed by a per-row
+ * `nth(i).innerText()` is not a snapshot: each read re-resolves the locator and
+ * auto-waits, so a re-render in between (a sync applying ops, a view swap) leaves
+ * `nth(i)` pointing past the new end of the list and the read waits out its whole
+ * timeout on a row that no longer exists.
+ *
+ * The result is still whatever the DOM showed at that instant, so callers that
+ * assert on the list after a sync should poll it (`expect.poll`) rather than
+ * trust one read.
+ *
  * @param client - The simulated E2E client
  * @returns Array of task titles in order
  */
 export const getTaskTitles = async (client: SimulatedE2EClient): Promise<string[]> => {
-  const tasks = client.page.locator('task .task-title');
-  const count = await tasks.count();
-  const titles: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const text = await tasks.nth(i).innerText();
-    titles.push(text.trim());
-  }
-  return titles;
+  const titles = await client.page.locator('task .task-title').allInnerTexts();
+  return titles.map((title) => title.trim());
 };
 
 /**
