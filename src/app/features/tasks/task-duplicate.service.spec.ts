@@ -93,6 +93,56 @@ describe('TaskDuplicateService', () => {
     );
   });
 
+  it('keeps the priority of the task and of each subtask', () => {
+    const prioritizedSubTask: Task = { ...subTask, id: 'sub-high', priority: 3 };
+    const unprioritizedSubTask: Task = { ...subTask, id: 'sub-none', priority: null };
+    taskService.add.and.returnValue('new-parent-task');
+    taskService.createNewTaskWithDefaults.and.returnValue({
+      ...DEFAULT_TASK,
+      id: 'new-sub-task',
+      projectId: 'project-1',
+    });
+
+    service.duplicate({
+      ...parentTask,
+      priority: 1,
+      subTaskIds: [prioritizedSubTask.id, unprioritizedSubTask.id],
+      subTasks: [prioritizedSubTask, unprioritizedSubTask],
+    });
+
+    expect(taskService.add.calls.mostRecent().args[2]).toEqual(
+      jasmine.objectContaining({ priority: 1 }),
+    );
+    const additionals = taskService.createNewTaskWithDefaults.calls
+      .allArgs()
+      .map(([arg]) => arg.additional);
+    expect(additionals[0]).toEqual(jasmine.objectContaining({ priority: 3 }));
+    expect(additionals[1]).not.toEqual(jasmine.objectContaining({ priority: 3 }));
+    expect(additionals[1]?.priority).toBeUndefined();
+  });
+
+  it('does not copy a stale string priority from an old test build', () => {
+    const staleSubTask = { ...subTask, priority: 'high' } as unknown as Task;
+    taskService.add.and.returnValue('new-parent-task');
+    taskService.createNewTaskWithDefaults.and.returnValue({
+      ...DEFAULT_TASK,
+      id: 'new-sub-task',
+      projectId: 'project-1',
+    });
+
+    service.duplicate({
+      ...parentTask,
+      priority: 'high',
+      subTasks: [staleSubTask],
+    } as unknown as TaskWithSubTasks);
+
+    expect('priority' in taskService.add.calls.mostRecent().args[2]!).toBe(false);
+    expect(
+      'priority' in
+        taskService.createNewTaskWithDefaults.calls.mostRecent().args[0].additional!,
+    ).toBe(false);
+  });
+
   it('does not duplicate a subtask', () => {
     const result = service.duplicate({
       ...parentTask,
