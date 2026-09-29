@@ -712,6 +712,14 @@ test.describe('@supersync reorder crossing content (#10264)', () => {
             const a = await createSimulatedClient(browser, baseURL!, 'A', testRunId);
             clients.push(a);
             await a.sync.setupSuperSync(config);
+            // setupSuperSync's background-sync blocks do not survive A's reloads;
+            // a startup sync would take the rejection instead of the sync click.
+            await a.page.addInitScript(() => {
+              const flags = window as unknown as Record<string, unknown>;
+              flags.__SP_E2E_BLOCK_AUTO_SYNC = true;
+              flags.__SP_E2E_BLOCK_IMMEDIATE_UPLOAD = true;
+              flags.__SP_E2E_BLOCK_WS_DOWNLOAD = true;
+            });
             if (datedHabit) {
               const dates = await habitDates(a.page);
               (data.seeds[0].simpleCounter as Record<string, unknown>).countOnDay = {
