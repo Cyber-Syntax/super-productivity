@@ -80,9 +80,9 @@ The Operation Log enables two types of synchronization:
 
 **B. File-provider operation transport**
 
-- The v2 format stores a full state/archive baseline and a bounded recent-op
+- The default v2 format stores a full state/archive baseline and a bounded recent-op
   buffer in one `sync-data.json`; each op-bearing upload rewrites that monolith.
-- The v3 split format makes `sync-ops.json` the hot commit point and rewrites
+- The opt-in v3 split format makes `sync-ops.json` the hot commit point and rewrites
   the snapshot/archive file only for bootstrap, compaction, migration, force-upload,
   or gap recovery.
 - Both formats feed the same client operation-log pipeline. See
@@ -112,7 +112,7 @@ The Operation Log serves **four distinct purposes**:
 | Purpose                    | Description                                       | Status       |
 | -------------------------- | ------------------------------------------------- | ------------ |
 | **A. Local Persistence**   | Fast writes, crash recovery, event sourcing       | Complete ✅  |
-| **B. File-Based Sync**     | Existing v2 monolith or v3 split files            | Complete ✅  |
+| **B. File-Based Sync**     | Default v2 monolith or opt-in v3 split files      | Complete ✅  |
 | **C. Server Sync**         | Upload/download individual operations (SuperSync) | Complete ✅¹ |
 | **D. Validation & Repair** | Prevent corruption, auto-repair invalid state     | Complete ✅  |
 
@@ -753,10 +753,10 @@ records only the durable format boundary and its owners.
 
 ## B.1 Two Current Wire Formats
 
-| Format                                 | Remote files                                                                                          | Normal op-bearing sync                                                                                                                                                      |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **v2 monolith (existing folders)**     | `sync-data.json` plus recovery backup                                                                 | Downloads the changed monolith, merges its retained ops, rebuilds current state plus both archive partitions, and conditionally rewrites the complete monolith.             |
-| **v3 split files (new empty folders)** | `sync-ops.json`, referenced snapshot generation, compatibility state/backup files, and a v2 tombstone | Conditionally rewrites the bounded ops commit point. A full state/archive snapshot is written only for initial bootstrap, compaction, migration, force-upload, or recovery. |
+| Format                                      | Remote files                                                                                          | Normal op-bearing sync                                                                                                                                                      |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **v2 monolith (default)**                   | `sync-data.json` plus recovery backup                                                                 | Downloads the changed monolith, merges its retained ops, rebuilds current state plus both archive partitions, and conditionally rewrites the complete monolith.             |
+| **v3 split files (opt-in “Surgical sync”)** | `sync-ops.json`, referenced snapshot generation, compatibility state/backup files, and a v2 tombstone | Conditionally rewrites the bounded ops commit point. A full state/archive snapshot is written only for initial bootstrap, compaction, migration, force-upload, or recovery. |
 
 Both formats carry a vector clock, schema version, synthetic `syncVersion`, and
 a bounded `recentOps` buffer. That common adapter and envelope do not themselves
@@ -779,9 +779,14 @@ Where the provider enforces CAS, a revision mismatch aborts the write and a
 later cycle downloads before retrying. The best-effort backends cannot broadly
 guarantee that every simultaneous write race will abort.
 
-With no saved format preference, discovery selects existing v2/v3 files and
-uses v3 only for an empty folder. Saved `isUseSplitSyncFiles: false` keeps v2
-behavior; `true` explicitly opts into migration. Provider errors never establish
+With no saved format preference, discovery joins existing v2/v3 files, and an
+empty folder gets `EMPTY_FOLDER_SYNC_FORMAT` in `file-based-sync-format.ts`: v2,
+as in v19.1. The v3 empty-folder default (#10289) stays off until its snapshot,
+interrupted-write and legacy-overwrite follow-ups land. Discovery ignores v16
+`__meta_` files; the v2/v3 readers still stop normal syncs with
+`LegacySyncFormatDetectedError`, and a confirmed force overwrite writes the
+empty-folder format. Saved `isUseSplitSyncFiles: false` keeps v2 behavior;
+`true` explicitly opts into migration. Provider errors never establish
 emptiness. Discovery is target-scoped, in memory, and does not persist a choice.
 
 The v3 migration is one-way for a sync folder. It leaves a v3 tombstone in the
@@ -1348,7 +1353,7 @@ during the periodic full young-to-old flush.
 Archive partitions can contain tens of thousands of tasks and worklogs. Treating
 them as an always-rewritten remote file makes a small archive transition pay for
 the whole historical dataset. The cost depends on the transport: default v2
-file sync still rewrites that full baseline, while SuperSync and v3
+file sync still rewrites that full baseline, while SuperSync and the opt-in v3
 file format can normally transfer the operation without rewriting a remote
 archive snapshot.
 
@@ -1365,7 +1370,7 @@ partitions.
 | --------------------- | -------------------------------------------------------------------------------------------------------------- |
 | **SuperSync**         | The archive operation payload; no separate archive-file upload.                                                |
 | **File v2 (default)** | The operation buffer plus complete state, `archiveYoung`, and `archiveOld` in the rewritten monolith.          |
-| **File v3**           | Normally the operation in `sync-ops.json`; complete archive partitions when a snapshot is created or replaced. |
+| **File v3 (opt-in)**  | Normally the operation in `sync-ops.json`; complete archive partitions when a snapshot is created or replaced. |
 
 ### E.3 Workflow: moveToArchive
 

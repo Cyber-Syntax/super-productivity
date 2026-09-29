@@ -135,11 +135,13 @@ export const createWebDavFolder = async (
  *
  * @param browser - Playwright Browser instance
  * @param baseURL - Base URL for the app
+ * @param acceptedConfirms - Exact extra confirmations the test deliberately triggers
  * @returns Object with context and page
  */
 export const setupSyncClient = async (
   browser: Browser,
   baseURL: string | undefined,
+  acceptedConfirms: readonly RegExp[] = [],
 ): Promise<{ context: BrowserContext; page: Page }> => {
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
@@ -170,7 +172,9 @@ export const setupSyncClient = async (
     }
 
     if (dialog.type() === 'confirm') {
-      const isExpectedDialog = FRESH_CLIENT_CONFIRM.test(normalizeDialogMessage(message));
+      const isExpectedDialog = [FRESH_CLIENT_CONFIRM, ...acceptedConfirms].some(
+        (pattern) => pattern.test(normalizeDialogMessage(message)),
+      );
 
       if (!isExpectedDialog) {
         console.error(`[E2E] Unexpected confirm dialog: "${message}"`);

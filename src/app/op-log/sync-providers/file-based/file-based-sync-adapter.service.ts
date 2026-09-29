@@ -34,6 +34,7 @@ import {
   discoverFileSyncFormat,
   downloadLegacySyncFile,
   annotatePrimaryRev,
+  EMPTY_FOLDER_SYNC_FORMAT,
 } from './file-based-sync-format';
 import { assertSyncFileVersion } from './assert-sync-file-version';
 import { OpLog } from '../../../core/log';
@@ -1529,9 +1530,7 @@ export class FileBasedSyncAdapterService {
   // SPLIT-FILE ("SURGICAL SYNC") FORMAT
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Whether the user explicitly requested v3, including migration of existing v2.
-   */
+  /** Whether the user explicitly requested v3, including migration of existing v2. */
   private _isSplitSyncEnabled(): boolean {
     const svc = this._injector.get(GlobalConfigService, null);
     return svc?.sync()?.isUseSplitSyncFiles === true;
@@ -1553,7 +1552,7 @@ export class FileBasedSyncAdapterService {
     this._abortDownloadIfTargetChanged(generation, key);
     // Never remember emptiness: a different client may create v2 before upload.
     if (format !== 'empty') this._remoteFormats.set(key, format);
-    return format !== 'v2';
+    return (format === 'empty' ? EMPTY_FOLDER_SYNC_FORMAT : format) === 'v3';
   }
 
   private _isPendingSplitMigration(data: FileBasedOpsFile): boolean {

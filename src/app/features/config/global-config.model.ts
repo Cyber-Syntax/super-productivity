@@ -230,7 +230,7 @@ export type SyncConfig = Readonly<{
   isEncryptionEnabled?: boolean;
   isCompressionEnabled?: boolean;
   /**
-   * Absent: use the remote format, or v3 for a new empty folder.
+   * Absent: use the remote format, or EMPTY_FOLDER_SYNC_FORMAT (v2) for an empty folder.
    * false: retain legacy v2 behavior. true: explicitly migrate v2 to v3.
    * The migration is one-way per sync folder.
    */
