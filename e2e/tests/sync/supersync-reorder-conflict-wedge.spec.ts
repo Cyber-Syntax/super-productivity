@@ -19,7 +19,9 @@ import {
 /**
  * #10264: real app reducers, capture, encrypted transport and conflict recovery.
  * Dispatch the same persistent actions as the UI. Never select a side in the
- * whole-dataset dialog: syncAndWait() would silently hide this regression.
+ * whole-dataset dialog: it replaces one device's entire dataset and would hide
+ * this regression. The strict `sync` helper below fails on it, and so does
+ * syncAndWait() unless it is given `conflictDialog`.
  */
 const PROJECT_ID = 'INBOX_PROJECT';
 type Family = 'project notes' | 'Today notes' | 'habits' | 'boards' | 'sections';
