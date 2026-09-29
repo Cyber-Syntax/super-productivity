@@ -4255,9 +4255,9 @@ export class ConflictResolutionService {
       // pending reorder from current state; entity LWW would lose its list write.
       if (
         ctx.localOpsForEntity.every(
-          (localOp) =>
+          (localOp, _i, pending) =>
             areCommutingSectionOperations(remoteOp, localOp) ||
-            areCommutingReorderAndContentOperations(remoteOp, localOp),
+            areCommutingReorderAndContentOperations(remoteOp, localOp, pending),
         )
       ) {
         return { isSupersededOrDuplicate: false, conflict: null };

@@ -5,6 +5,7 @@ import { BoardsState } from '../../features/boards/store/boards.reducer';
 import { IssueProviderState } from '../../features/issue/issue.model';
 import {
   ActionType,
+  EntityType,
   extractActionPayload,
   isMultiEntityPayload,
   Operation,
@@ -24,7 +25,14 @@ export interface ReorderReplaySnapshot extends SectionReplaySnapshot {
   issueProvider: IssueProviderState;
 }
 
-const reorderTypes = new Map<ActionType, Operation['entityType']>([
+type Payload = Record<string, unknown>;
+
+/**
+ * Each reorder writes exactly one ordered list per context: `project.noteIds`
+ * (project notes) or `note.todayOrder` (every tag view), `simpleCounter.ids`,
+ * `boardCfgs`, the context's slots of `section.ids`, `issueProvider.ids`.
+ */
+const REORDERS = new Map<ActionType, EntityType>([
   [ActionType.NOTE_UPDATE_ORDER, 'NOTE'],
   [ActionType.COUNTER_UPDATE_ORDER, 'SIMPLE_COUNTER'],
   [ActionType.BOARDS_SORT, 'BOARD'],
@@ -32,15 +40,97 @@ const reorderTypes = new Map<ActionType, Operation['entityType']>([
   [ActionType.ISSUE_PROVIDER_SORT_FIRST, 'ISSUE_PROVIDER'],
 ]);
 
-const payloadOf = (op: Operation): Record<string, unknown> =>
-  extractActionPayload(op.payload) as Record<string, unknown>;
+/**
+ * Entity fields a reducer routes into an ordered list or its membership. Every
+ * other field of a recognized patch is written on that entity only, so it
+ * commutes with every reorder. `id` is identity: only an unchanged id commutes.
+ * reorder-conflict.util.spec.ts runs every model field through the real
+ * reducers and fails until a new list-writing field is classified here.
+ * - `container`: moves the entity to another list (`updateNote` leaves
+ *   `project.noteIds` stale; `updateSectionOrder` selects slots by `contextId`).
+ * - `placement`: `section.taskIds`, owned by the section placement actions.
+ * - `todayOrder`: `updateNote` adds or removes the note in `note.todayOrder`.
+ *   Only a project reorder writes another list: a tag reorder of released
+ *   clients overwrites `todayOrder` with its stale membership.
+ */
+const LIST_ROUTED_FIELDS: Partial<
+  Record<EntityType, Record<string, 'container' | 'placement' | 'todayOrder'>>
+> = {
+  NOTE: { projectId: 'container', isPinnedToToday: 'todayOrder' },
+  SECTION: { contextId: 'container', contextType: 'container', taskIds: 'placement' },
+};
+
+interface PatchShape {
+  entityType: EntityType;
+  /** The target id and the fields its reducer writes; undefined when malformed. */
+  read: (p: Payload) => { id: unknown; changes: Payload } | undefined;
+  /** The same action carrying the current values of those fields. */
+  write: (p: Payload, entity: Payload) => Payload;
+}
+const isRecord = (value: unknown): value is Payload =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+const pick = (entity: Payload, fields: Payload): Payload =>
+  Object.fromEntries(Object.keys(fields).map((field) => [field, entity[field]]));
+const entityUpdate = (entityType: EntityType, key: string): PatchShape => ({
+  entityType,
+  read: (p) => {
+    const update = p[key];
+    return isRecord(update) && isRecord(update['changes'])
+      ? { id: update['id'], changes: update['changes'] }
+      : undefined;
+  },
+  write: (p, entity) => ({
+    ...p,
+    [key]: {
+      id: entity['id'],
+      changes: pick(entity, (p[key] as Payload)['changes'] as Payload),
+    },
+  }),
+});
+const dayCount = (day: 'today' | 'date'): PatchShape => ({
+  entityType: 'SIMPLE_COUNTER',
+  read: (p) =>
+    typeof p[day] === 'string' && typeof p['newVal'] === 'number'
+      ? { id: p['id'], changes: { countOnDay: p['newVal'] } }
+      : undefined,
+  write: (p, entity) => ({
+    ...p,
+    newVal:
+      (entity['countOnDay'] as Record<string, number> | undefined)?.[p[day] as string] ??
+      0,
+  }),
+});
+
+/**
+ * Absolute single-entity patches: a replacement with current values is a local
+ * no-op. Deltas, moves, deletes and every unlisted action never commute here.
+ * Without causal proof a rejected patch keeps the entity LWW fallback; for a pin
+ * that snapshot omits receivers' `todayOrder` write (section-conflict-replay.md).
+ */
+const PATCHES: Partial<Record<ActionType, PatchShape>> = {
+  [ActionType.NOTE_UPDATE]: entityUpdate('NOTE', 'note'),
+  [ActionType.SECTION_UPDATE]: entityUpdate('SECTION', 'section'),
+  [ActionType.COUNTER_UPDATE]: entityUpdate('SIMPLE_COUNTER', 'simpleCounter'),
+  [ActionType.ISSUE_PROVIDER_UPDATE]: entityUpdate('ISSUE_PROVIDER', 'issueProvider'),
+  [ActionType.BOARDS_UPDATE]: {
+    entityType: 'BOARD',
+    read: (p) =>
+      isRecord(p['updates']) ? { id: p['id'], changes: p['updates'] } : undefined,
+    write: (p, entity) => ({ ...p, updates: pick(entity, p['updates'] as Payload) }),
+  },
+  [ActionType.COUNTER_SET_TODAY]: dayCount('today'),
+  [ActionType.COUNTER_SET_FOR_DATE]: dayCount('date'),
+};
+
+const payloadOf = (op: Operation): Payload =>
+  (extractActionPayload(op.payload) ?? {}) as Payload;
 
 /** Match the UI's actual list write, including its declared conflict footprint. */
 export const isContentReorderOperation = (op: Operation): boolean => {
-  if (reorderTypes.get(op.actionType) !== op.entityType || op.opType !== OpType.Move)
+  if (REORDERS.get(op.actionType) !== op.entityType || op.opType !== OpType.Move)
     return false;
   const payload = payloadOf(op);
-  const ids = payload?.['ids'];
+  const ids = payload['ids'];
   if (!Array.isArray(ids) || !ids.length || !ids.every((id) => typeof id === 'string'))
     return false;
   const declared = getOpEntityIds(op);
@@ -53,10 +143,9 @@ export const isContentReorderOperation = (op: Operation): boolean => {
     return false;
   if (op.actionType === ActionType.NOTE_UPDATE_ORDER) {
     return (
-      (payload['activeContextType'] === WorkContextType.PROJECT &&
-        typeof payload['activeContextId'] === 'string') ||
-      (payload['activeContextType'] === WorkContextType.TAG &&
-        payload['activeContextId'] === 'TODAY')
+      (payload['activeContextType'] === WorkContextType.PROJECT ||
+        payload['activeContextType'] === WorkContextType.TAG) &&
+      typeof payload['activeContextId'] === 'string'
     );
   }
   return (
@@ -65,170 +154,120 @@ export const isContentReorderOperation = (op: Operation): boolean => {
   );
 };
 
-const hasOnlyFields = (value: unknown, fields: string[]): boolean =>
-  !!value &&
-  typeof value === 'object' &&
-  Object.keys(value).length > 0 &&
-  Object.keys(value).every((key) => fields.includes(key));
-
-const isOrderAndContent = (order: Operation, edit: Operation): boolean => {
+const readPatch = (op: Operation): { id: string; changes: Payload } | undefined => {
+  const shape = PATCHES[op.actionType];
+  const patch = shape?.read(payloadOf(op));
+  const id = op.entityId;
   if (
-    !isContentReorderOperation(order) ||
+    !shape ||
+    !patch ||
+    !id ||
+    shape.entityType !== op.entityType ||
+    op.opType !== OpType.Update ||
+    patch.id !== id ||
+    getOpEntityIds(op).length !== 1 ||
+    !Object.keys(patch.changes).length
+  )
+    return undefined;
+  return { id, changes: patch.changes };
+};
+
+/** A recognized patch that also writes `note.todayOrder`. */
+const writesTodayOrder = (op: Operation): boolean =>
+  Object.keys(readPatch(op)?.changes ?? {}).some(
+    (field) => LIST_ROUTED_FIELDS[op.entityType]?.[field] === 'todayOrder',
+  );
+
+/**
+ * The one rule: a reorder commutes with a single-entity patch of one of the
+ * entities it lists when the patch keeps the entity's identity and writes
+ * neither the reordered list nor its membership.
+ */
+const isReorderAndEdit = (order: Operation, edit: Operation): boolean => {
+  const patch = readPatch(edit);
+  if (
+    !patch ||
     order.entityType !== edit.entityType ||
-    edit.opType !== OpType.Update ||
-    getOpEntityIds(edit).length !== 1 ||
-    !getOpEntityIds(order).includes(edit.entityId!)
+    !isContentReorderOperation(order) ||
+    !getOpEntityIds(order).includes(patch.id)
   )
     return false;
-  const p = payloadOf(edit);
-  switch (edit.actionType) {
-    case ActionType.NOTE_UPDATE: {
-      const note = p?.['note'] as { id?: string; changes?: unknown } | undefined;
-      // Pinning and moving notes also write membership/order, so keep them out.
-      return (
-        order.entityType === 'NOTE' &&
-        note?.id === edit.entityId &&
-        hasOnlyFields(note?.changes, ['content', 'modified'])
-      );
-    }
-    case ActionType.COUNTER_SET_TODAY:
-    case ActionType.COUNTER_SET_FOR_DATE:
-      return (
-        order.entityType === 'SIMPLE_COUNTER' &&
-        p?.['id'] === edit.entityId &&
-        typeof p[
-          edit.actionType === ActionType.COUNTER_SET_FOR_DATE ? 'date' : 'today'
-        ] === 'string' &&
-        typeof p['newVal'] === 'number'
-      );
-    case ActionType.BOARDS_UPDATE: {
-      const updates = p?.['updates'] as Record<string, unknown>;
-      return (
-        order.entityType === 'BOARD' &&
-        p?.['id'] === edit.entityId &&
-        // The editor sends the full config. It changes one board in place;
-        // changing its identity would also change the ordered membership.
-        hasOnlyFields(updates, ['id', 'title', 'cols', 'panels']) &&
-        (!('id' in updates) || updates['id'] === edit.entityId)
-      );
-    }
-    case ActionType.SECTION_UPDATE: {
-      const section = p?.['section'] as { id?: string; changes?: unknown } | undefined;
-      return (
-        order.entityType === 'SECTION' &&
-        section?.id === edit.entityId &&
-        hasOnlyFields(section?.changes, ['title'])
-      );
-    }
-    case ActionType.ISSUE_PROVIDER_UPDATE: {
-      const provider = p?.['issueProvider'] as
-        | { id?: string; changes?: unknown }
-        | undefined;
-      const changes = provider?.changes;
-      // The unsorted adapter changes ordered membership only when id changes.
-      // Both full editor models and partial settings updates otherwise commute.
-      return (
-        order.entityType === 'ISSUE_PROVIDER' &&
-        provider?.id === edit.entityId &&
-        !!changes &&
-        typeof changes === 'object' &&
-        !Array.isArray(changes) &&
-        Object.keys(changes).length > 0 &&
-        (!('id' in changes) || changes.id === edit.entityId)
-      );
-    }
-    default:
-      return false;
-  }
+  const isTagOrder = payloadOf(order)['activeContextType'] === WorkContextType.TAG;
+  return Object.keys(patch.changes).every((field) => {
+    if (field === 'id') return patch.changes['id'] === patch.id;
+    const route = LIST_ROUTED_FIELDS[edit.entityType]?.[field];
+    return !route || (route === 'todayOrder' && !isTagOrder);
+  });
 };
 
 // Admission still requires an exact commuting retained remote row (except
-// absolute habit counts, reissued without proof); this list only selects
+// absolute habit counts, reissued without proof); this only selects
 // candidates for that existing fail-closed causal proof.
 export const isReorderConflictOperation = (op: Operation): boolean =>
-  isContentReorderOperation(op) ||
-  [
-    ActionType.NOTE_UPDATE,
-    ActionType.COUNTER_SET_TODAY,
-    ActionType.COUNTER_SET_FOR_DATE,
-    ActionType.BOARDS_UPDATE,
-    ActionType.SECTION_UPDATE,
-    ActionType.ISSUE_PROVIDER_UPDATE,
-  ].includes(op.actionType);
+  isContentReorderOperation(op) || !!PATCHES[op.actionType];
 
-/** Only these reproduced content writes commute with the corresponding reorder. */
+/**
+ * Whether a reorder and a single-entity patch commute. `pending` holds the
+ * pending local ops of `b`'s entity when `b` is one of them. Each rejected op
+ * is reissued with the final value, so a note whose Today membership is written
+ * twice would be pinned twice on released receivers, which prepend without
+ * dedup: that crossing keeps the safety stop.
+ */
 export const areCommutingReorderAndContentOperations = (
   a: Operation,
   b: Operation,
-): boolean => isOrderAndContent(a, b) || isOrderAndContent(b, a);
+  pending: Operation[] = [],
+): boolean =>
+  (isReorderAndEdit(a, b) || isReorderAndEdit(b, a)) &&
+  !(writesTodayOrder(b) && pending.some((op) => op !== b && writesTodayOrder(op)));
+
+const entityOf = (
+  snapshot: ReorderReplaySnapshot,
+  entityType: EntityType,
+  id: string,
+): Payload | undefined => {
+  if (entityType === 'BOARD')
+    return snapshot.boards.boardCfgs.find((board) => board.id === id) as
+      | Payload
+      | undefined;
+  const slices: Partial<Record<EntityType, { entities: Record<string, unknown> }>> = {
+    NOTE: snapshot.note,
+    SECTION: snapshot.section,
+    SIMPLE_COUNTER: snapshot.simpleCounter,
+    ISSUE_PROVIDER: snapshot.issueProvider,
+  };
+  return slices[entityType]?.entities[id] as Payload | undefined;
+};
 
 /**
- * Reissue a current list or the current values of a commuting content patch.
- * Each replacement is a local no-op; status-blind replay remains idempotent.
- * The existing causal recovery transaction supplies the dominating clock.
+ * Reissue a current list or the current values of a commuting patch's own
+ * fields. Each replacement is a local no-op; status-blind replay remains
+ * idempotent. The existing causal recovery transaction supplies the clock.
  */
 export const projectReorderConflictAgainstState = (
   operation: Operation,
   snapshot: ReorderReplaySnapshot,
 ): SectionReplayProjection => {
   const p = payloadOf(operation);
-  const withPayload = (actionPayload: Record<string, unknown>): Operation => ({
+  const withPayload = (actionPayload: Payload): Operation => ({
     ...operation,
     payload: isMultiEntityPayload(operation.payload)
       ? { ...operation.payload, actionPayload, entityChanges: [] }
       : actionPayload,
   });
-  // Retain only the fields carried by the rejected edit, with their current
-  // values. Whole-entity LWW overwrites unrelated fields and stamps modified
-  // (and released clients strip SimpleCounter.type); these idempotent updates
-  // preserve both content and unrelated state.
-  if (!isContentReorderOperation(operation)) {
+  const patch = PATCHES[operation.actionType];
+  if (patch) {
+    // Whole-entity LWW would overwrite unrelated fields and stamp modified (and
+    // released clients strip SimpleCounter.type); a patch of its own fields does not.
     const id = operation.entityId!;
-    const countDate =
+    const entity = entityOf(snapshot, patch.entityType, id);
+    if (!entity) return { kind: 'superseded' };
+    const day =
       p[operation.actionType === ActionType.COUNTER_SET_FOR_DATE ? 'date' : 'today'];
-    let actionPayload: Record<string, unknown>;
-    if (
-      operation.actionType === ActionType.COUNTER_SET_TODAY ||
-      operation.actionType === ActionType.COUNTER_SET_FOR_DATE
-    ) {
-      const entity = snapshot.simpleCounter.entities[id];
-      if (!entity) return { kind: 'superseded' };
-      actionPayload = { ...p, newVal: entity.countOnDay[countDate as string] ?? 0 };
-    } else {
-      const key =
-        operation.entityType === 'NOTE'
-          ? 'note'
-          : operation.entityType === 'SECTION'
-            ? 'section'
-            : operation.entityType === 'ISSUE_PROVIDER'
-              ? 'issueProvider'
-              : 'updates';
-      const entity =
-        operation.entityType === 'NOTE'
-          ? snapshot.note.entities[id]
-          : operation.entityType === 'SECTION'
-            ? snapshot.section.entities[id]
-            : operation.entityType === 'ISSUE_PROVIDER'
-              ? snapshot.issueProvider.entities[id]
-              : snapshot.boards.boardCfgs.find((board) => board.id === id);
-      if (!entity) return { kind: 'superseded' };
-      const original =
-        key === 'updates' ? p[key] : (p[key] as { changes: unknown }).changes;
-      const changes = Object.fromEntries(
-        Object.keys(original as object).map((field) => [
-          field,
-          (entity as unknown as Record<string, unknown>)[field],
-        ]),
-      );
-      actionPayload = { ...p, [key]: key === 'updates' ? changes : { id, changes } };
-    }
     return {
       kind: 'replay',
-      operation: withPayload(actionPayload),
-      order: {
-        scope: JSON.stringify([operation.actionType, id, countDate]),
-        position: 0,
-      },
+      operation: withPayload(patch.write(p, entity)),
+      order: { scope: JSON.stringify([operation.actionType, id, day]), position: 0 },
     };
   }
   let ids: string[];

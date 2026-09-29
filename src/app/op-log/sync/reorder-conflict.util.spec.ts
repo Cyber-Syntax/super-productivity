@@ -1,0 +1,528 @@
+import { Action, ActionReducer, MetaReducer } from '@ngrx/store';
+import { Note } from '../../features/note/note.model';
+import {
+  addNote,
+  updateNote,
+  updateNoteOrder,
+} from '../../features/note/store/note.actions';
+import { initialNoteState, noteReducer } from '../../features/note/store/note.reducer';
+import { projectReducer } from '../../features/project/store/project.reducer';
+import { tagReducer } from '../../features/tag/store/tag.reducer';
+import { taskReducer } from '../../features/tasks/store/task.reducer';
+import { plannerReducer } from '../../features/planner/store/planner.reducer';
+import { Section, SectionState } from '../../features/section/section.model';
+import {
+  addSection,
+  updateSection,
+  updateSectionOrder,
+} from '../../features/section/store/section.actions';
+import {
+  initialSectionState,
+  sectionReducer,
+} from '../../features/section/store/section.reducer';
+import {
+  SimpleCounterCopy,
+  SimpleCounterState,
+  SimpleCounterType,
+} from '../../features/simple-counter/simple-counter.model';
+import {
+  addSimpleCounter,
+  setSimpleCounterCounterForDate,
+  setSimpleCounterCounterToday,
+  updateSimpleCounter,
+  updateSimpleCounterOrder,
+} from '../../features/simple-counter/store/simple-counter.actions';
+import {
+  initialSimpleCounterState,
+  simpleCounterReducer,
+} from '../../features/simple-counter/store/simple-counter.reducer';
+import { EMPTY_SIMPLE_COUNTER } from '../../features/simple-counter/simple-counter.const';
+import { BoardCfg } from '../../features/boards/boards.model';
+import { BoardsActions } from '../../features/boards/store/boards.actions';
+import {
+  boardsReducer,
+  initialBoardsState,
+} from '../../features/boards/store/boards.reducer';
+import { DEFAULT_PANEL_CFG } from '../../features/boards/boards.const';
+import {
+  IssueProvider,
+  IssueProviderPluginType,
+  IssueProviderState,
+} from '../../features/issue/issue.model';
+import { IssueProviderActions } from '../../features/issue/store/issue-provider.actions';
+import {
+  issueProviderInitialState,
+  issueProviderReducer,
+} from '../../features/issue/store/issue-provider.reducer';
+import {
+  DEFAULT_ISSUE_PROVIDER_CFGS,
+  ISSUE_PROVIDER_DEFAULT_COMMON_CFG,
+} from '../../features/issue/issue.const';
+import { WorkContextType } from '../../features/work-context/work-context.model';
+import { META_REDUCERS } from '../../root-store/meta/meta-reducer-registry';
+import { reducerFailureGuardMetaReducer } from '../../root-store/meta/reducer-failure-guard.meta-reducer';
+import { actionLoggerReducer } from '../../root-store/meta/action-logger.reducer';
+import { createBaseState } from '../../root-store/meta/task-shared-meta-reducers/test-utils';
+import { RootState } from '../../root-store/root-state';
+import { operationCaptureMetaReducer } from '../capture/operation-capture.meta-reducer';
+import { Operation } from '../core/operation.types';
+import { PersistentAction } from '../core/persistent-action.interface';
+import { areCommutingReorderAndContentOperations } from './reorder-conflict.util';
+
+/**
+ * Pins the one reorder rule to what the reducers write. Every field of every
+ * single-entity patch runs through the real feature reducers and the registered
+ * meta-reducers against every reorder shape; the `Required<…>` fixtures make a
+ * new model field a compile error here until it is exercised. Whatever the rule
+ * admits must leave the reordered list and its membership alone, commute with
+ * the reorder in both application orders and stay idempotent, because restart
+ * replays a rejected original, the concurrent order and then the reissue.
+ */
+type State = RootState & {
+  section: SectionState;
+  simpleCounter: SimpleCounterState;
+  issueProvider: IssueProviderState;
+};
+
+const P = 'project1';
+const OTHER_PROJECT = 'project2';
+const DAY = '2026-09-20';
+const OTHER_DAY = '2026-09-19';
+
+// The guard would hide a throw; capture and the logger never write state.
+const skipped: MetaReducer[] = [
+  reducerFailureGuardMetaReducer,
+  operationCaptureMetaReducer,
+  actionLoggerReducer,
+];
+const reduce: ActionReducer<State> = META_REDUCERS.filter(
+  (meta) => !skipped.includes(meta),
+).reduceRight(
+  (inner, meta) => meta(inner) as ActionReducer<State>,
+  (s: State | undefined, a: Action): State => {
+    const st = s as State;
+    return {
+      ...st,
+      tasks: taskReducer(st.tasks, a),
+      tag: tagReducer(st.tag, a),
+      projects: projectReducer(st.projects, a),
+      planner: plannerReducer(st.planner, a),
+      note: noteReducer(st.note, a),
+      section: sectionReducer(st.section, a),
+      simpleCounter: simpleCounterReducer(st.simpleCounter, a),
+      boards: boardsReducer(st.boards, a),
+      issueProvider: issueProviderReducer(st.issueProvider, a),
+    };
+  },
+);
+const apply = (s: State, actions: Action[]): State => actions.reduce(reduce, s);
+
+const provider = (id: string): IssueProvider =>
+  ({
+    ...DEFAULT_ISSUE_PROVIDER_CFGS.GITLAB,
+    ...ISSUE_PROVIDER_DEFAULT_COMMON_CFG,
+    id,
+    issueProviderKey: 'GITLAB',
+    isEnabled: true,
+  }) as IssueProvider;
+
+const buildBase = (): State => {
+  const base = createBaseState();
+  const project = base.projects.entities[P]!;
+  return apply(
+    {
+      ...base,
+      projects: {
+        ids: [P, OTHER_PROJECT],
+        entities: { [P]: project, [OTHER_PROJECT]: { ...project, id: OTHER_PROJECT } },
+      },
+      note: initialNoteState,
+      section: initialSectionState,
+      simpleCounter: initialSimpleCounterState,
+      boards: initialBoardsState,
+      issueProvider: issueProviderInitialState,
+    },
+    [
+      // Today lists t, b, a; project P lists a, b, w (w is not pinned).
+      ...['t', 'w', 'b', 'a'].map((id) =>
+        addNote({
+          note: {
+            id,
+            projectId: id === 't' ? null : P,
+            isPinnedToToday: id !== 'w',
+            content: id,
+            created: 1,
+            modified: 1,
+          },
+        }),
+      ),
+      ...['alpha', 'foreign', 'beta', 'untouched'].map((id) =>
+        addSection({
+          section: {
+            id,
+            title: id,
+            contextId: id === 'foreign' ? 'TODAY' : P,
+            contextType: id === 'foreign' ? WorkContextType.TAG : WorkContextType.PROJECT,
+            taskIds: [],
+          },
+        }),
+      ),
+      ...['a', 'disabled', 'b', 'u'].map((id) =>
+        addSimpleCounter({
+          simpleCounter: {
+            ...EMPTY_SIMPLE_COUNTER,
+            id,
+            title: id,
+            isEnabled: id !== 'disabled',
+            type: SimpleCounterType.StopWatch,
+            countOnDay: Object.fromEntries([[DAY, 1]]),
+          },
+        }),
+      ),
+      ...['a', 'b', 'u'].map((id) =>
+        BoardsActions.addBoard({
+          board: {
+            id,
+            title: id,
+            cols: 2,
+            panels: [{ ...DEFAULT_PANEL_CFG, id: `panel-${id}` }],
+          },
+        }),
+      ),
+      ...['a', 'b', 'u'].map((id) =>
+        IssueProviderActions.addIssueProvider({ issueProvider: provider(id) }),
+      ),
+    ],
+  );
+};
+
+// Every model field, each with a value that differs from the fixture.
+const NOTE_FIELDS: Required<Note> = {
+  id: 'a',
+  projectId: OTHER_PROJECT,
+  isPinnedToToday: false,
+  content: 'changed',
+  imgUrl: 'https://img.example.invalid/x.png',
+  isLock: true,
+  backgroundColor: '#123456',
+  created: 5,
+  modified: 6,
+};
+const COUNTER_FIELDS: Required<SimpleCounterCopy> = {
+  id: 'a',
+  title: 'changed',
+  isEnabled: false,
+  isHideButton: true,
+  icon: 'star',
+  type: SimpleCounterType.ClickCounter,
+  isTrackStreaks: true,
+  streakMinValue: 3,
+  streakMode: 'weekly-frequency',
+  streakWeekDays: Object.fromEntries([[1, true]]),
+  streakWeeklyFrequency: 2,
+  countdownDuration: 60000,
+  countOnDay: Object.fromEntries([[DAY, 4]]),
+  isOn: true,
+};
+const SECTION_FIELDS: Required<Section> = {
+  id: 'alpha',
+  contextId: 'TODAY',
+  contextType: WorkContextType.TAG,
+  title: 'changed',
+  isExpanded: false,
+  taskIds: ['task-x'],
+};
+const BOARD_FIELDS: Required<BoardCfg> = {
+  id: 'a',
+  title: 'changed',
+  cols: 4,
+  panels: [{ ...DEFAULT_PANEL_CFG, id: 'panel-new', title: 'new' }],
+};
+// The shared and plugin fields, plus every key of each built-in provider.
+const PROVIDER_BASE_FIELDS: Required<IssueProviderPluginType> = {
+  id: 'a',
+  isEnabled: false,
+  issueProviderKey: 'plugin:changed',
+  defaultProjectId: OTHER_PROJECT,
+  pinnedSearch: 'changed',
+  migratedFromProjectId: OTHER_PROJECT,
+  isAutoPoll: false,
+  isAutoAddToBacklog: true,
+  isIntegratedAddTaskBar: true,
+  pollingMode: 'always',
+  defaultTagIds: ['tag1'],
+  defaultNote: 'changed',
+  pluginId: 'changed-plugin',
+  pluginConfig: { changed: true },
+};
+const PROVIDER_FIELDS: Record<string, unknown> = {
+  ...Object.fromEntries(
+    Object.values(DEFAULT_ISSUE_PROVIDER_CFGS).flatMap((cfg) =>
+      Object.keys(cfg).map((key) => [key, `changed-${key}`]),
+    ),
+  ),
+  ...PROVIDER_BASE_FIELDS,
+};
+
+interface Reorder {
+  name: string;
+  action: PersistentAction;
+  isTagOrder?: boolean;
+  /** The ordered list the reorder writes. */
+  list: (s: State) => string[];
+  /** The entities that belong to that list. */
+  members: (s: State) => string[];
+}
+const sorted = (ids: (string | undefined)[]): string[] =>
+  ids.filter((id): id is string => !!id).sort();
+const reorders: Reorder[] = [
+  {
+    name: 'project notes',
+    action: updateNoteOrder({
+      ids: ['b', 'a', 'w'],
+      activeContextType: WorkContextType.PROJECT,
+      activeContextId: P,
+    }),
+    list: (s) => s.projects.entities[P]!.noteIds,
+    members: (s) =>
+      sorted(Object.values(s.note.entities).map((n) => (n?.projectId === P ? n.id : ''))),
+  },
+  ...['TODAY', 'tag1'].map(
+    (tagId): Reorder => ({
+      name: `${tagId} tag notes`,
+      action: updateNoteOrder({
+        ids: ['b', 'a', 't'],
+        activeContextType: WorkContextType.TAG,
+        activeContextId: tagId,
+      }),
+      isTagOrder: true,
+      list: (s) => s.note.todayOrder,
+      members: (s) => [
+        ...sorted(s.note.todayOrder),
+        ...sorted(
+          Object.values(s.note.entities).map((n) => (n?.isPinnedToToday ? n.id : '')),
+        ),
+      ],
+    }),
+  ),
+  {
+    name: 'habits',
+    action: updateSimpleCounterOrder({ ids: ['b', 'a', 'u'] }),
+    list: (s) => s.simpleCounter.ids,
+    members: (s) => sorted(s.simpleCounter.ids),
+  },
+  {
+    name: 'boards',
+    action: BoardsActions.sortBoards({ ids: ['b', 'a', 'u'] }),
+    list: (s) => s.boards.boardCfgs.map((board) => board.id),
+    members: (s) => sorted(s.boards.boardCfgs.map((board) => board.id)),
+  },
+  {
+    name: 'sections',
+    action: updateSectionOrder({ contextId: P, ids: ['beta', 'alpha', 'untouched'] }),
+    list: (s) => s.section.ids,
+    // The context is the pair: the reorder selects its slots by contextId.
+    members: (s) =>
+      sorted(
+        Object.values(s.section.entities).map((section) =>
+          section?.contextId === P && section.contextType === WorkContextType.PROJECT
+            ? section.id
+            : '',
+        ),
+      ),
+  },
+  {
+    name: 'issue providers',
+    action: IssueProviderActions.sortIssueProvidersFirst({ ids: ['b', 'a', 'u'] }),
+    list: (s) => s.issueProvider.ids,
+    members: (s) => sorted(s.issueProvider.ids),
+  },
+];
+
+interface Patch {
+  action: PersistentAction;
+  target: string;
+  changes: Record<string, unknown>;
+}
+const patchesFor = (reorder: Reorder): Patch[] => {
+  const each = (
+    target: string,
+    fields: object,
+    build: (changes: Record<string, unknown>) => PersistentAction,
+  ): Patch[] =>
+    [
+      ...Object.entries(fields).map(([field, value]) => ({ [field]: value })),
+      { id: 'renamed' },
+    ].map((changes) => ({ action: build(changes), target, changes }));
+  const note = (target: string, changes: Partial<Note>): Patch => ({
+    action: updateNote({ note: { id: target, changes } }),
+    target,
+    changes,
+  });
+  switch (reorder.action.meta.entityType) {
+    case 'NOTE':
+      return [
+        ...each('a', NOTE_FIELDS, (changes) =>
+          updateNote({ note: { id: 'a', changes: changes as Partial<Note> } }),
+        ),
+        // A redundant pin, a real pin, and an edit of a note the order does not list.
+        note('a', { isPinnedToToday: true }),
+        note('w', { isPinnedToToday: true }),
+        note('w', { content: 'changed' }),
+      ];
+    case 'SIMPLE_COUNTER':
+      return [
+        ...each('a', COUNTER_FIELDS, (changes) =>
+          updateSimpleCounter({
+            simpleCounter: { id: 'a', changes: changes as Partial<SimpleCounterCopy> },
+          }),
+        ),
+        {
+          action: setSimpleCounterCounterToday({ id: 'a', newVal: 7, today: DAY }),
+          target: 'a',
+          changes: { countOnDay: DAY },
+        },
+        {
+          action: setSimpleCounterCounterForDate({ id: 'a', newVal: 8, date: OTHER_DAY }),
+          target: 'a',
+          changes: { countOnDay: OTHER_DAY },
+        },
+      ];
+    case 'SECTION':
+      return each('alpha', SECTION_FIELDS, (changes) =>
+        updateSection({ section: { id: 'alpha', changes: changes as Partial<Section> } }),
+      );
+    case 'BOARD':
+      return each('a', BOARD_FIELDS, (updates) =>
+        BoardsActions.updateBoard({ id: 'a', updates: updates as Partial<BoardCfg> }),
+      );
+    default:
+      return each('a', PROVIDER_FIELDS, (changes) =>
+        IssueProviderActions.updateIssueProvider({
+          issueProvider: { id: 'a', changes: changes as Partial<IssueProvider> },
+        }),
+      );
+  }
+};
+
+/**
+ * The stops the rule must keep, spelled out here rather than read from the util:
+ * identity changes; moves to another container of the list (`updateNote` leaves
+ * `project.noteIds` stale, `updateSectionOrder` selects slots by context);
+ * `section.taskIds`, the placement list its own actions own; and Today
+ * membership against a tag order, which released clients overwrite with it.
+ */
+const expectedStop = (reorder: Reorder, patch: Patch): string | undefined => {
+  const fields = Object.keys(patch.changes);
+  const listed = (reorder.action as unknown as { ids: string[] }).ids;
+  if (!listed.includes(patch.target)) return 'the order does not list it';
+  if (fields.includes('id') && patch.changes['id'] !== patch.target) return 'identity';
+  if (reorder.action.meta.entityType === 'NOTE') {
+    if (fields.includes('projectId')) return 'container move';
+    if (reorder.isTagOrder && fields.includes('isPinnedToToday'))
+      return 'Today membership';
+  }
+  if (reorder.action.meta.entityType === 'SECTION') {
+    if (fields.includes('contextId') || fields.includes('contextType'))
+      return 'container move';
+    if (fields.includes('taskIds')) return 'task placement';
+  }
+  return undefined;
+};
+
+let opSeq = 0;
+const toOp = (action: PersistentAction): Operation => {
+  const { type, meta, ...actionPayload } = action;
+  return {
+    id: `op-${++opSeq}`,
+    actionType: type,
+    opType: meta.opType,
+    entityType: meta.entityType,
+    entityId: meta.entityId ?? meta.entityIds![0],
+    entityIds: meta.entityIds ?? (meta.entityId ? [meta.entityId] : undefined),
+    payload: { actionPayload, entityChanges: [] },
+    clientId: 'test',
+    vectorClock: { test: 1 },
+    timestamp: 1,
+    schemaVersion: 1,
+  } as Operation;
+};
+
+describe('reorder rule against the real reducers', () => {
+  let base: State;
+  beforeAll(() => {
+    base = buildBase();
+  });
+
+  for (const reorder of reorders) {
+    for (const patch of patchesFor(reorder)) {
+      const stop = expectedStop(reorder, patch);
+      const changes = Object.entries(patch.changes).map(
+        ([field, value]) => `${field}=${typeof value === 'object' ? '{…}' : value}`,
+      );
+      it(
+        `${reorder.name} × ${patch.action.type} ${patch.target} {${changes}}: ` +
+          (stop ? `keeps the safety stop (${stop})` : 'commutes'),
+        () => {
+          const [order, edit] = [toOp(reorder.action), toOp(patch.action)];
+          const admitted = areCommutingReorderAndContentOperations(order, edit);
+          expect(areCommutingReorderAndContentOperations(edit, order)).toBe(admitted);
+          expect(admitted).toBe(!stop);
+          if (!admitted) return;
+          const edited = reduce(base, patch.action);
+          expect(reorder.list(edited)).toEqual(reorder.list(base));
+          expect(reorder.members(edited)).toEqual(reorder.members(base));
+          const both = reduce(edited, reorder.action);
+          expect(reduce(reduce(base, reorder.action), patch.action)).toEqual(both);
+          expect(reduce(edited, patch.action)).toEqual(edited);
+          expect(reduce(both, patch.action)).toEqual(both);
+        },
+      );
+    }
+  }
+
+  it('keeps the stop when one pending note writes Today membership twice', () => {
+    const order = updateNoteOrder({
+      ids: ['b', 'a', 'w'],
+      activeContextType: WorkContextType.PROJECT,
+      activeContextId: P,
+    });
+    const unpin = updateNote({ note: { id: 'a', changes: { isPinnedToToday: false } } });
+    const pin = updateNote({ note: { id: 'a', changes: { isPinnedToToday: true } } });
+    const lock = updateNote({ note: { id: 'a', changes: { isLock: true } } });
+    // The reducers commute in every interleaving that keeps the note's own order.
+    const expected = apply(base, [unpin, pin, order]);
+    expect(apply(base, [order, unpin, pin])).toEqual(expected);
+    expect(apply(base, [unpin, order, pin])).toEqual(expected);
+    expect(expected.note.todayOrder).toEqual(['a', 'b', 't']);
+    // Both would be reissued as pins, which released receivers prepend twice.
+    const [orderOp, unpinOp, pinOp, lockOp] = [order, unpin, pin, lock].map(toOp);
+    const pending = [unpinOp, pinOp, lockOp];
+    expect(areCommutingReorderAndContentOperations(orderOp, unpinOp, [unpinOp])).toBe(
+      true,
+    );
+    expect(areCommutingReorderAndContentOperations(orderOp, unpinOp, pending)).toBe(
+      false,
+    );
+    expect(areCommutingReorderAndContentOperations(orderOp, pinOp, pending)).toBe(false);
+    expect(areCommutingReorderAndContentOperations(orderOp, lockOp, pending)).toBe(true);
+    expect(
+      areCommutingReorderAndContentOperations(orderOp, lockOp, [unpinOp, lockOp]),
+    ).toBe(true);
+    // A pending order is unaffected by the remote note's membership writes.
+    expect(areCommutingReorderAndContentOperations(unpinOp, orderOp, [orderOp])).toBe(
+      true,
+    );
+  });
+
+  it('refuses a patch whose declared entity type is not its action', () => {
+    const order = toOp(updateSimpleCounterOrder({ ids: ['b', 'a', 'u'] }));
+    const content = toOp(updateNote({ note: { id: 'a', changes: { content: 'x' } } }));
+    expect(
+      areCommutingReorderAndContentOperations(order, {
+        ...content,
+        entityType: 'SIMPLE_COUNTER',
+      }),
+    ).toBe(false);
+  });
+});
