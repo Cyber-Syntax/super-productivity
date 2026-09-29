@@ -1923,15 +1923,10 @@ export class FileBasedSyncAdapterService {
     // the recovery loop imports the newer v2 payload and retries. Explicit
     // snapshot replacement omits the rev and intentionally force-overwrites.
     // null reserves a new folder with a conditional create, before publishing ops.
-    // There is no prior v2 primary to back up in that case.
-    if (expectedLegacyRev !== null) {
-      await provider.uploadFile(
-        FILE_BASED_SYNC_CONSTANTS.BACKUP_FILE,
-        encoded,
-        null,
-        true,
-      );
-    }
+    // A v2 .bak can outlive its primary (an interrupted Android write, a deleted
+    // file), so it is neutralized here too. A v2 client that wins the create writes
+    // no .bak of its own, and v2 recovery refuses a version-3 .bak.
+    await provider.uploadFile(FILE_BASED_SYNC_CONSTANTS.BACKUP_FILE, encoded, null, true);
     // Overwrite the legacy single file in place (never remove it).
     await provider.uploadFile(
       FILE_BASED_SYNC_CONSTANTS.SYNC_FILE,

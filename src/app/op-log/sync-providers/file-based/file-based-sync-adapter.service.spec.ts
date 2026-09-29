@@ -18,6 +18,7 @@ import {
   EncryptNoPasswordError,
   FileSyncTargetChangedError,
   InvalidDataSPError,
+  JsonParseError,
   PlaintextWhenEncryptionExpectedError,
   RemoteFileNotFoundAPIError,
   SplitSyncFormatDetectedError,
@@ -442,6 +443,75 @@ describe('FileBasedSyncAdapterService', () => {
       expect(result.accepted).toBeTrue();
       expect(parseWithPrefix(files.get(C.SYNC_FILE)!).version).toBe(2);
       expect([...files.keys()].sort()).toEqual([C.BACKUP_FILE, C.SYNC_FILE].sort());
+    });
+
+    // Surgical sync claims sync-data.json with a create-only tombstone before it
+    // publishes the split files of a new folder.
+    describe('when Surgical sync creates a folder', () => {
+      beforeEach(() => {
+        splitSyncEnabled = true;
+      });
+
+      it('neutralizes the backup before the create-only claim', async () => {
+        await adapter.uploadOps([createMockSyncOp()], 'client1');
+
+        const writes = mockProvider.uploadFile.calls
+          .allArgs()
+          .map(([path, , revToMatch, isForce]) => [path, revToMatch, isForce]);
+        expect(writes.slice(0, 2)).toEqual([
+          [C.BACKUP_FILE, null, true],
+          [C.SYNC_FILE, null, false],
+        ]);
+        expect(parseWithPrefix(files.get(C.SYNC_FILE)!)).toEqual(
+          jasmine.objectContaining({ version: 3, format: 'split' }),
+        );
+        const ops = parseWithPrefix(
+          files.get(C.OPS_FILE)!,
+        ) as unknown as FileBasedOpsFile;
+        expect(ops.version).toBe(3);
+      });
+
+      it('neutralizes a v2 backup that outlived its primary before claiming the folder', async () => {
+        // An interrupted Android write (delete, create, write) or a deleted primary
+        // can leave only the backup of a v2 folder.
+        files.set(C.BACKUP_FILE, addPrefix(createMockSyncData({ clientId: 'v2Client' })));
+        await adapter.uploadOps([createMockSyncOp()], 'client1');
+
+        // A reader with Surgical sync saved off recovers an unreadable primary from
+        // the backup and heals it: a live v2 backup would resurrect v2 over the
+        // tombstone, a neutralized one is refused.
+        splitSyncEnabled = false;
+        files.set(
+          C.SYNC_FILE,
+          getSyncFilePrefix({ isCompress: false, isEncrypt: false, modelVersion: 3 }) +
+            '{"version":3',
+        );
+        await expectAsync(adapter.downloadOps(0)).toBeRejectedWithError(JsonParseError);
+      });
+
+      it('publishes no split files when a v2 client creates sync-data.json first', async () => {
+        const v2 = addPrefix(createMockSyncData({ clientId: 'v2Client' }));
+        mockProvider.uploadFile.and.callFake(async (path: string, data: string) => {
+          if (path === C.SYNC_FILE) {
+            // The v2 client commits after this client found no sync-data.json.
+            files.set(path, v2);
+            throw new UploadRevToMatchMismatchAPIError(path);
+          }
+          files.set(path, data);
+          return { rev: path + '-rev' };
+        });
+
+        await expectAsync(
+          adapter.uploadOps([createMockSyncOp()], 'client1'),
+        ).toBeRejectedWithError(UploadRevToMatchMismatchAPIError);
+
+        expect(files.get(C.SYNC_FILE)).toBe(v2);
+        expect(files.has(C.OPS_FILE) || files.has(C.STATE_FILE)).toBeFalse();
+        // Only the backup was neutralized, and v2 recovery refuses a version-3 backup.
+        expect(parseWithPrefix(files.get(C.BACKUP_FILE)!)).toEqual(
+          jasmine.objectContaining({ version: 3, format: 'split' }),
+        );
+      });
     });
 
     for (const path of [C.OPS_FILE, C.SYNC_FILE]) {
