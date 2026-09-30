@@ -1717,6 +1717,90 @@ describe('OperationLogStoreService', () => {
     });
   });
 
+  describe('rebasePendingLocalOps', () => {
+    it('should move pending local ops past a clock in place and in seq order', async () => {
+      const first = createTestOperation({
+        id: 'rebase-1',
+        vectorClock: { testClient: 5 },
+      });
+      const second = createTestOperation({
+        id: 'rebase-2',
+        vectorClock: { testClient: 6 },
+      });
+      await service.appendWithVectorClockOverwrite(first, 'local');
+      await service.appendWithVectorClockOverwrite(second, 'local');
+      const before = await service.getOpsAfterSeq(0);
+      // Warm the unsynced cache: it must not keep serving the stale clocks.
+      expect((await service.getUnsynced()).length).toBe(2);
+
+      const rebased = await service.rebasePendingLocalOps([second.id, first.id], {
+        remote: 3,
+        testClient: 2,
+      });
+
+      const after = await service.getOpsAfterSeq(0);
+      expect(after.map(({ seq, op }) => [seq, op.id])).toEqual(
+        before.map(({ seq, op }) => [seq, op.id]),
+      );
+      expect(after.map(({ op }) => op.payload)).toEqual([first.payload, second.payload]);
+      expect(after.map(({ op }) => op.vectorClock)).toEqual([
+        { testClient: 7, remote: 3 },
+        { testClient: 8, remote: 3 },
+      ]);
+      expect(rebased.map(({ id }) => id)).toEqual([first.id, second.id]);
+      expect((await service.getUnsynced()).map(({ op }) => op.vectorClock)).toEqual(
+        after.map(({ op }) => op.vectorClock),
+      );
+      expect(await service.getVectorClock()).toEqual({ testClient: 8, remote: 3 });
+    });
+
+    it('should rebase nothing when an op is no longer pending', async () => {
+      const pending = createTestOperation({
+        id: 'rebase-pending',
+        vectorClock: { testClient: 1 },
+      });
+      const op = createTestOperation({
+        id: 'rebase-synced',
+        vectorClock: { testClient: 2 },
+      });
+      await service.appendWithVectorClockOverwrite(pending, 'local');
+      await service.appendWithVectorClockOverwrite(op, 'local');
+      await service.markSynced([(await service.getOpsAfterSeq(0))[1].seq]);
+
+      // All or nothing: the op that is still pending keeps its clock as well.
+      expect(
+        await service.rebasePendingLocalOps([pending.id, op.id], { remote: 1 }),
+      ).toEqual([]);
+      expect(
+        (await service.getOpsAfterSeq(0)).map((entry) => entry.op.vectorClock),
+      ).toEqual([pending.vectorClock, op.vectorClock]);
+      expect(await service.getVectorClock()).toEqual({ testClient: 2 });
+    });
+
+    it('should keep the counter of a rebased op the state cache covers', async () => {
+      const covered = createTestOperation({
+        id: 'covered',
+        vectorClock: { testClient: 5 },
+      });
+      const tail = createTestOperation({ id: 'tail', vectorClock: { testClient: 6 } });
+      await service.appendWithVectorClockOverwrite(covered, 'local');
+      await service.saveStateCache({
+        state: {},
+        lastAppliedOpSeq: await service.getLastSeq(),
+        vectorClock: { testClient: 5 },
+        compactedAt: 1,
+        schemaVersion: 1,
+      });
+      await service.appendWithVectorClockOverwrite(tail, 'local');
+
+      await service.rebasePendingLocalOps([covered.id, tail.id], { remote: 3 });
+
+      // Boot restores this clock and merges the tail (the tail op carries 8),
+      // so no later op can reuse the covered op's new counter.
+      expect((await service.loadStateCache())?.vectorClock).toEqual({ testClient: 7 });
+    });
+  });
+
   describe('appendMixedSourceBatchSkipDuplicates', () => {
     it('should atomically append a replacement and reject its predecessors with one timestamp', async () => {
       const firstPredecessor = createTestOperation({ id: 'first-predecessor' });

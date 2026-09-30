@@ -5,6 +5,7 @@ import {
   mergeChangedFields,
   MergeSideMeta,
   noiseTiebreakSide,
+  touchesCrossEntityTaskFields,
 } from './conflict-disjoint-merge.util';
 import { ActionType, EntityType, OpType, Operation } from '../core/operation.types';
 
@@ -386,6 +387,35 @@ describe('conflict-disjoint-merge.util', () => {
       expect(isAdditiveTimeOp(deferredSyncTimeSpentOp())).toBe(true);
       expect(isAdditiveTimeOp(removeTimeSpentOp())).toBe(true);
       expect(isAdditiveTimeOp(op())).toBe(false);
+    });
+  });
+
+  describe('touchesCrossEntityTaskFields', () => {
+    const edit = (task: Record<string, unknown>): Operation =>
+      op({ payload: { task: { id: 'task-1', ...task } } });
+    const touches = (ops: Operation[]): boolean =>
+      touchesCrossEntityTaskFields(ops, 'task', 'task-1');
+
+    it('is false for time deltas and edits of fields only task ops write', () => {
+      expect(touches([syncTimeSpentOp(), deferredSyncTimeSpentOp()])).toBe(false);
+      expect(touches([syncTimeSpentOp(), edit({ title: 'T', notes: 'N' })])).toBe(false);
+    });
+
+    it('is true for a field that ops of other entity types also write', () => {
+      for (const field of ['tagIds', 'projectId', 'parentId', 'dueDay', 'dueWithTime']) {
+        expect(touches([syncTimeSpentOp(), edit({ [field]: 'x' })]))
+          .withContext(field)
+          .toBe(true);
+      }
+    });
+
+    it('is true when an op cannot be read as task fields', () => {
+      expect(touches([convertToSubTaskOp()])).toBe(true);
+      const plannerMove = op({
+        entityType: 'PLANNER' as EntityType,
+        payload: { actionPayload: {}, entityChanges: [] },
+      });
+      expect(touches([syncTimeSpentOp(), plannerMove])).toBe(true);
     });
   });
 

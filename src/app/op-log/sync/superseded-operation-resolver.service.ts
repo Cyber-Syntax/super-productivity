@@ -49,6 +49,12 @@ import {
   ReorderReplaySnapshot,
 } from './reorder-conflict.util';
 import { UnsupportedMultiEntityConflictError } from '../core/errors/sync-errors';
+import {
+  isCommutingTimeDeltaCrossing,
+  isDisjointMergeEligible,
+  touchesCrossEntityTaskFields,
+} from './conflict-disjoint-merge.util';
+import { getPayloadKey } from '../core/entity-registry';
 
 type SupersededOperation = {
   opId: string;
@@ -210,15 +216,36 @@ export class SupersededOperationResolverService {
     item: SupersededOperation,
     context: SectionCausalReplayContext,
   ): SectionCausalReplayDecision {
+    if (
+      !CAUSALLY_REPLAYABLE_SECTION_ACTIONS.has(item.op.actionType) &&
+      !isReorderConflictOperation(item.op)
+    ) {
+      return 'fallback';
+    }
+    const row = this._findAppliedConflictRow(item, context);
+    return row &&
+      (areCommutingSectionOperations(item.op, row.op) ||
+        areCommutingReorderAndContentOperations(item.op, row.op))
+      ? 'replay'
+      : 'fallback';
+  }
+
+  /**
+   * The causal proof for a rejection: the one retained row whose clock is the
+   * `existingClock` the server compared against, when it is an applied, synced
+   * remote op concurrent with the rejected one.
+   */
+  private _findAppliedConflictRow(
+    item: SupersededOperation,
+    context: SectionCausalReplayContext,
+  ): OperationLogEntry | undefined {
     const existingClock = item.existingClock;
     if (
-      (!CAUSALLY_REPLAYABLE_SECTION_ACTIONS.has(item.op.actionType) &&
-        !isReorderConflictOperation(item.op)) ||
       !existingClock ||
       compareVectorClocks(item.op.vectorClock, existingClock) !==
         VectorClockComparison.CONCURRENT
     ) {
-      return 'fallback';
+      return undefined;
     }
 
     const itemEntityIds = getOpEntityIds(item.op);
@@ -236,23 +263,168 @@ export class SupersededOperationResolverService {
       }
     }
     const matchingRetainedEntries = Array.from(matchingRetainedEntriesById.values());
-    if (matchingRetainedEntries.length !== 1) {
-      return 'fallback';
+    const row = matchingRetainedEntries[0];
+    return matchingRetainedEntries.length === 1 &&
+      row.source === 'remote' &&
+      row.syncedAt !== undefined &&
+      row.applicationStatus === 'applied' &&
+      row.rejectedAt === undefined &&
+      row.reducerRejectedAt === undefined
+      ? row
+      : undefined;
+  }
+
+  /**
+   * #10214 follow-up. Conflict detection applies a remote row that commutes
+   * with a task's pending time work (`isCommutingTimeDeltaCrossing`) and keeps
+   * the pending ops as they are, so their clocks miss the row and the server
+   * rejects them. Rebase every pending op of such a task past the row IN PLACE
+   * (`rebasePendingLocalOps`): a `syncTimeSpent` delta stays additive instead
+   * of becoming an LWW snapshot that overwrites other devices' concurrent time,
+   * and it still replays exactly once. The proof is the applied row whose clock
+   * the server compared against, so no full re-download is needed.
+   *
+   * Only ops this upload got rejected move, and no other tab uploads meanwhile
+   * (UPLOAD lock). Any other pending op may be one another tab uploaded and has
+   * not marked synced yet; moving it would turn its re-upload into an
+   * INVALID_OP_ID.
+   *
+   * @param assertFence re-asserts the sync cycle's epoch before the write (#9074)
+   * @returns ids of the rebased ops; they stay pending and need an upload
+   */
+  async rebaseCommutingTimeDeltaRejections(
+    rejectedOps: SupersededOperation[],
+    assertFence?: (context: string) => void,
+  ): Promise<Set<string>> {
+    const rebasedOpIds = new Set<string>();
+    const rejectedOpIds = new Set(rejectedOps.map(({ opId }) => opId));
+    const rejectedByTask = new Map<string, SupersededOperation[]>();
+    for (const item of rejectedOps) {
+      const { op, existingClock } = item;
+      if (
+        existingClock &&
+        compareVectorClocks(op.vectorClock, existingClock) ===
+          VectorClockComparison.GREATER_THAN
+      ) {
+        // Rebased already (e.g. by another tab) and this tab sent a stale cached
+        // copy: the stored op is accepted once the cache is dropped.
+        rebasedOpIds.add(item.opId);
+      } else if (
+        op.entityType === 'TASK' &&
+        op.entityId &&
+        getOpEntityIds(op).length === 1
+      ) {
+        rejectedByTask.set(op.entityId, [
+          ...(rejectedByTask.get(op.entityId) ?? []),
+          item,
+        ]);
+      }
     }
-    const retainedConflictEntry = matchingRetainedEntries[0];
-    if (
-      retainedConflictEntry.source !== 'remote' ||
-      retainedConflictEntry.syncedAt === undefined ||
-      retainedConflictEntry.applicationStatus !== 'applied' ||
-      retainedConflictEntry.rejectedAt !== undefined ||
-      retainedConflictEntry.reducerRejectedAt !== undefined ||
-      (!areCommutingSectionOperations(item.op, retainedConflictEntry.op) &&
-        !areCommutingReorderAndContentOperations(item.op, retainedConflictEntry.op))
-    ) {
-      return 'fallback';
+    if (rebasedOpIds.size > 0) {
+      this.opLogStore.invalidateUnsyncedCache();
+    }
+    if (rejectedByTask.size === 0) {
+      return rebasedOpIds;
     }
 
-    return 'replay';
+    // UPLOAD before OPERATION_LOG, the order the upload service takes them in.
+    const underLocks = (work: () => Promise<void>): Promise<void> =>
+      this.lockService.request(LOCK_NAMES.UPLOAD, () =>
+        this.lockService.request(LOCK_NAMES.OPERATION_LOG, work),
+      );
+    await underLocks(async () => {
+      const clientId = await this.clientIdProvider.loadClientId();
+      const pendingEntries = (await this.opLogStore.getUnsynced()).filter(
+        ({ op }) =>
+          op.entityType === 'TASK' &&
+          getOpEntityIds(op).some((id) => rejectedByTask.has(id)),
+      );
+      if (pendingEntries.length === 0) {
+        return;
+      }
+      // A pending op concurrent with an applied row was captured before that
+      // row was appended, so only the tail after the oldest one can hold it.
+      const tail = await this.opLogStore.getOpsAfterSeq(pendingEntries[0].seq);
+      const context = buildSectionCausalReplayContext(tail);
+      const payloadKey = getPayloadKey('TASK') ?? 'task';
+      for (const [taskId, items] of rejectedByTask) {
+        // Seq order; every pending op of the task moves so their clocks keep it.
+        const taskEntries = pendingEntries.filter(({ op }) =>
+          getOpEntityIds(op).includes(taskId),
+        );
+        const pendingOps = taskEntries.map(({ op }) => op);
+        // The server may already hold later ops of the task from this client:
+        // against a crossing delta it accepts this client's own delta and each
+        // op dominating it. Receivers apply the moved ops after those, so they
+        // must commute, or a second rename would lose to the first everywhere.
+        // Any entity type counts: a planner move declares the task it moves.
+        const acceptedLaterOps = tail
+          .filter(
+            ({ seq, op, source, syncedAt }) =>
+              source === 'local' &&
+              syncedAt !== undefined &&
+              seq > (taskEntries[0]?.seq ?? Infinity) &&
+              getOpEntityIds(op).includes(taskId),
+          )
+          .map(({ op }) => op);
+        let clockToDominate: VectorClock = {};
+        const isProven =
+          pendingOps.every(
+            (op) =>
+              rejectedOpIds.has(op.id) &&
+              op.clientId === clientId &&
+              getOpEntityIds(op).length === 1,
+          ) &&
+          // Ops of other entity types write these task fields too, where no
+          // check here sees them (deleting a tag rewrites every task's tagIds).
+          // A moved op touching one could land on the wrong side of such a write.
+          !touchesCrossEntityTaskFields(
+            [...pendingOps, ...acceptedLaterOps],
+            payloadKey,
+            taskId,
+          ) &&
+          (acceptedLaterOps.length === 0 ||
+            isDisjointMergeEligible({
+              localOps: pendingOps,
+              remoteOps: acceptedLaterOps,
+              payloadKey,
+              entityId: taskId,
+            })) &&
+          items.every((item) => {
+            const row = this._findAppliedConflictRow(item, context);
+            if (!row) return false;
+            const crossing = pendingOps.filter(
+              (op) =>
+                compareVectorClocks(op.vectorClock, row.op.vectorClock) ===
+                VectorClockComparison.CONCURRENT,
+            );
+            clockToDominate = mergeVectorClocks(clockToDominate, row.op.vectorClock);
+            return (
+              crossing.some((op) => op.id === item.opId) &&
+              isCommutingTimeDeltaCrossing({
+                localOps: crossing,
+                remoteOps: [row.op],
+                payloadKey,
+                entityId: taskId,
+              })
+            );
+          });
+        if (!isProven) {
+          continue;
+        }
+        assertFence?.('time-delta rejection rebase');
+        const rebased = await this.opLogStore.rebasePendingLocalOps(
+          pendingOps.map((op) => op.id),
+          clockToDominate,
+        );
+        rebased.forEach((op) => rebasedOpIds.add(op.id));
+        OpLog.normal(
+          `SupersededOperationResolverService: Rebased ${rebased.length} pending op(s) ` +
+            `of TASK:${taskId} past a commuting remote edit`,
+        );
+      }
+    });
+    return rebasedOpIds;
   }
 
   /**

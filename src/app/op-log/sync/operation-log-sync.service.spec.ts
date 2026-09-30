@@ -847,6 +847,7 @@ describe('OperationLogSyncService', () => {
           expect(rejectedOpsHandlerServiceSpy.handleRejectedOps).toHaveBeenCalledWith(
             [{ opId: 'local-op-1', error: 'Some error', errorCode: 'VALIDATION_ERROR' }],
             jasmine.any(Function), // downloadCallback
+            jasmine.any(Function), // assertFence
           );
         });
 
@@ -1285,6 +1286,7 @@ describe('OperationLogSyncService', () => {
           // handleRejectedOps should be called with empty array
           expect(rejectedOpsHandlerServiceSpy.handleRejectedOps).toHaveBeenCalledWith(
             [],
+            jasmine.any(Function),
             jasmine.any(Function),
           );
         });

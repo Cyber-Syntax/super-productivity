@@ -326,6 +326,32 @@ export const isDisjointMergeEligible = (params: {
 };
 
 /**
+ * Task fields that ops of other entity types also write in their reducers
+ * (tag and project deletion, planner moves), unseen by task-level checks.
+ */
+const CROSS_ENTITY_TASK_FIELDS: readonly string[] = [
+  'tagIds',
+  'projectId',
+  'parentId',
+  'dueDay',
+  'dueWithTime',
+];
+
+/**
+ * True when these ops may write a task field that ops of other entity types
+ * also write, or when an op's fields cannot be told (opaque, e.g. a planner op
+ * that declares the task). A `syncTimeSpent` delta only touches time fields.
+ */
+export const touchesCrossEntityTaskFields = (
+  ops: Operation[],
+  payloadKey: string,
+  entityId: string,
+): boolean => {
+  const side = sideNonNoiseKeys(ops, payloadKey, entityId);
+  return !side || CROSS_ENTITY_TASK_FIELDS.some((field) => side.absolute.has(field));
+};
+
+/**
  * True when a crossing involving a `syncTimeSpent` delta commutes, i.e.
  * applying both sides as-is is lossless and convergent. A delta can never be
  * expressed as a merged patch (`isAdditiveTimeOp`), so for such a crossing

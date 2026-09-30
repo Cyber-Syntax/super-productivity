@@ -65,22 +65,23 @@ import { limitVectorClockSize, vectorClockToString } from '../../core/util/vecto
 import { CLIENT_ID_PROVIDER, ClientIdProvider } from '../util/client-id.provider';
 import { TabSeqFrontierService } from './tab-seq-frontier.service';
 import { CompactOperation } from './compact/compact-operation.types';
+import { isCompactOperation, encodeOperation } from './compact/operation-codec.service';
 import {
-  isCompactOperation,
-  decodeOperation,
-  encodeOperation,
-} from './compact/operation-codec.service';
+  LegacyTerminalRemoteFailuresMigrationEntry,
+  OpLogMetaEntry,
+  RawRebuildIncompleteEntry,
+  RawRebuildRecoveryEntry,
+  ReplayAnchorSnapshot,
+  StateCacheEntry,
+  StoredOperationLogEntry,
+  VectorClockEntry,
+  decodeStoredEntry,
+  getOpId,
+  getStoredOpType,
+  isPendingLocalEntryOf,
+} from './operation-log-store-rows';
 import { LockService } from '../sync/lock.service';
 import { rebaseLocalClockOnDurable } from './operation-log-clock.util';
-
-/**
- * Vector clock entry stored in the vector_clock object store.
- * Contains the clock and last update timestamp.
- */
-interface VectorClockEntry {
-  clock: VectorClock;
-  lastUpdate: number;
-}
 
 export interface MixedSourceOperationBatch {
   ops: readonly Operation[];
@@ -101,101 +102,6 @@ export type {
   ImportBackupReason,
   ImportBackupCaptureMeta,
 } from './import-backup-ring.util';
-
-/**
- * Shape stored in the `state_cache` store (keyPath `id`).
- *
- * `id` is optional in the type so the read-side return types stay assignable
- * from the looser snapshot shapes callers/tests construct (the pre-migration
- * return types did not surface `id`); the field is always present on rows
- * actually written here.
- */
-interface StateCacheEntry {
-  id?: string;
-  state: unknown;
-  lastAppliedOpSeq: number;
-  vectorClock: VectorClock;
-  compactedAt: number;
-  schemaVersion?: number;
-  compactionCounter?: number;
-  snapshotEntityKeys?: string[];
-}
-
-interface ReplayAnchorSnapshot {
-  state: unknown;
-  vectorClock: VectorClock;
-  compactedAt: number;
-  schemaVersion?: number;
-}
-
-export interface RawRebuildIncompleteEntry {
-  incomplete: true;
-  startedAt: number;
-  preservedLocalOps: Operation[];
-  backupRef?: ImportBackupRef;
-}
-
-export interface RawRebuildRecoveryEntry {
-  backupId: string;
-  backupSavedAt: number;
-  completedAt: number;
-}
-
-interface LegacyTerminalRemoteFailuresMigrationEntry {
-  version: number;
-}
-
-type OpLogMetaEntry =
-  | FullStateOpsMetaEntry
-  | RawRebuildIncompleteEntry
-  | RawRebuildRecoveryEntry
-  | LegacyTerminalRemoteFailuresMigrationEntry;
-
-/**
- * Stored operation log entry that can hold either compact or full operation format.
- * Used internally for backwards compatibility with existing data.
- */
-interface StoredOperationLogEntry {
-  seq: number;
-  op: Operation | CompactOperation;
-  appliedAt: number;
-  source: 'local' | 'remote';
-  syncedAt?: number;
-  rejectedAt?: number;
-  reducerRejectedAt?: number;
-  applicationStatus?: 'pending' | 'archive_pending' | 'applied' | 'failed';
-  retryCount?: number;
-}
-
-/**
- * Decodes a stored entry to a full OperationLogEntry.
- * Handles both compact and full operation formats for backwards compatibility.
- */
-const decodeStoredEntry = (stored: StoredOperationLogEntry): OperationLogEntry => {
-  const op = isCompactOperation(stored.op) ? decodeOperation(stored.op) : stored.op;
-  return {
-    seq: stored.seq,
-    op,
-    appliedAt: stored.appliedAt,
-    source: stored.source,
-    syncedAt: stored.syncedAt,
-    rejectedAt: stored.rejectedAt,
-    reducerRejectedAt: stored.reducerRejectedAt,
-    applicationStatus: stored.applicationStatus,
-    retryCount: stored.retryCount,
-  };
-};
-
-/**
- * Extracts the operation ID from either compact or full format.
- * Both formats use 'id' as the key for IndexedDB index compatibility.
- */
-const getOpId = (op: Operation | CompactOperation): string => {
-  return op.id;
-};
-
-const getStoredOpType = (op: Operation | CompactOperation): string =>
-  isCompactOperation(op) ? op.o : op.opType;
 
 /**
  * Calculates the durable clock after a reducer-committed remote batch.
@@ -1387,6 +1293,87 @@ export class OperationLogStoreService implements RemoteOperationApplyStorePort<O
       this._tabSeqFrontier.observeOwnWrite(writtenOp.seq);
     }
     return { written, skippedCount };
+  }
+
+  /**
+   * Moves pending local ops past `clockToDominate` IN PLACE, in seq order: id, seq
+   * and payload stay, so an additive `syncTimeSpent` replays once. Only for ops the
+   * server never stored; caller holds OPERATION_LOG. Rebases nothing if a row is no
+   * longer a pending op of this client (e.g. another tab synced it).
+   */
+  async rebasePendingLocalOps(
+    opIds: readonly string[],
+    clockToDominate: VectorClock,
+  ): Promise<Operation[]> {
+    await this._ensureInit();
+    const clientId = await this.clientIdProvider.loadClientId();
+    if (!clientId) return [];
+    const rebased: Operation[] = [];
+    let committedClock: VectorClock | undefined;
+    await this._adapter.transaction(
+      [
+        STORE_NAMES.OPS,
+        STORE_NAMES.VECTOR_CLOCK,
+        STORE_NAMES.STATE_CACHE,
+        STORE_NAMES.META,
+      ],
+      'readwrite',
+      async (tx) => {
+        const entries: StoredOperationLogEntry[] = [];
+        for (const opId of opIds) {
+          const entry = await tx.getFromIndex<StoredOperationLogEntry>(
+            STORE_NAMES.OPS,
+            OPS_INDEXES.BY_ID,
+            opId,
+          );
+          if (!isPendingLocalEntryOf(entry, clientId)) {
+            return;
+          }
+          entries.push(entry);
+        }
+        const cache = await tx.get<StateCacheEntry>(
+          STORE_NAMES.STATE_CACHE,
+          SINGLETON_KEY,
+        );
+        let clock =
+          (await tx.get<VectorClockEntry>(STORE_NAMES.VECTOR_CLOCK, SINGLETON_KEY))
+            ?.clock ?? {};
+        let coveredCounter = 0;
+        for (const entry of entries.sort((a, b) => a.seq - b.seq)) {
+          clock = rebaseLocalClockOnDurable(clock, clockToDominate, clientId);
+          const op: Operation = { ...decodeStoredEntry(entry).op, vectorClock: clock };
+          await tx.put(STORE_NAMES.OPS, { ...entry, op: encodeOperation(op) });
+          rebased.push(op);
+          if (cache && entry.seq <= cache.lastAppliedOpSeq)
+            coveredCounter = clock[clientId];
+        }
+        // Boot rebuilds the durable clock from the cache clock plus the op tail.
+        if (cache && coveredCounter > (cache.vectorClock[clientId] ?? 0)) {
+          await tx.put(STORE_NAMES.STATE_CACHE, {
+            ...cache,
+            vectorClock: { ...cache.vectorClock, [clientId]: coveredCounter },
+          });
+        }
+        committedClock = boundRebasedClock(
+          clock,
+          clientId,
+          await this._getLatestFullStateAuthorInTx(tx),
+        );
+        await tx.put(
+          STORE_NAMES.VECTOR_CLOCK,
+          { clock: committedClock, lastUpdate: Date.now() } satisfies VectorClockEntry,
+          SINGLETON_KEY,
+        );
+      },
+    );
+    if (committedClock) this._vectorClockCache = { ...committedClock };
+    this._invalidateUnsyncedCache();
+    return rebased;
+  }
+
+  /** Drops this tab's unsynced cache, which cannot see another tab's rebases. */
+  invalidateUnsyncedCache(): void {
+    this._invalidateUnsyncedCache();
   }
 
   /**

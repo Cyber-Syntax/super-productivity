@@ -530,14 +530,14 @@ export class OperationLogSyncService {
     try {
       // #9074: the rejection handler appends merged/local-win ops and flips
       // rejection markers — old-epoch writes that would resurrect data around
-      // a clean-slate replacement.
-      this.providerManager.assertSyncEpochUnchanged(
-        options?.fenceEpoch,
-        'rejected-ops handling',
-      );
+      // a clean-slate replacement. It re-asserts before its in-place rebase.
+      const assertFence = (context: string): void =>
+        this.providerManager.assertSyncEpochUnchanged(options?.fenceEpoch, context);
+      assertFence('rejected-ops handling');
       rejectionResult = await this.rejectedOpsHandlerService.handleRejectedOps(
         result.rejectedOps,
         downloadCallback,
+        assertFence,
       );
       if (rejectionResult.kind === 'cancelled') {
         return { kind: 'cancelled' };
