@@ -98,7 +98,7 @@ class Ledger {
 
   note(intent: Intent, writes: FuzzWrite[]): void {
     const [kind, id] = intent;
-    const type = /Task$|^track$/.test(kind)
+    const type = /Task|^track$/.test(kind)
       ? 'task'
       : /Note$/.test(kind)
         ? 'note'
@@ -342,8 +342,14 @@ export const runFuzz = async (options: FuzzOptions): Promise<FuzzResult> => {
     for (const entry of fullState) fail(`full-state-op:${entry.op.opType}`, `${name}`);
   }
 
-  // Oracle: convergence of every device with a fresh one.
+  // Oracle: each device lists a note in Today exactly when it is pinned.
   const reference = await harness.syncedState(observer);
+  for (const name of DEVICES) {
+    checkTodayNotes(name, await harness.syncedState(deviceOf(name)), fail);
+  }
+  checkTodayNotes('fresh', reference, fail);
+
+  // Oracle: convergence of every device with a fresh one.
   for (const name of DEVICES) {
     const state = await harness.syncedState(deviceOf(name));
     for (const diff of diffPaths(comparable(state), comparable(reference))) {
@@ -451,6 +457,34 @@ interface CheckedState {
   simpleCounter: EntityMap<SimpleCounter>;
   archiveYoung: { task: EntityMap<Task> };
 }
+
+/**
+ * The Today notes panel renders `note.todayOrder` unfiltered, and the pin
+ * toggle reads `isPinnedToToday`, so they must agree on every device. The
+ * convergence oracle misses a gap that all devices share.
+ */
+const checkTodayNotes = (
+  device: string,
+  snapshot: AppStateSnapshot,
+  fail: (signature: string, detail: string) => void,
+): void => {
+  const { note } = snapshot as unknown as CheckedState;
+  const listed = new Set(note.todayOrder);
+  for (const id of note.ids) {
+    const isPinned = !!note.entities[id]?.isPinnedToToday;
+    if (isPinned !== listed.has(id)) {
+      fail(
+        `today-notes:${isPinned ? 'pinned-not-listed' : 'listed-not-pinned'}`,
+        `${device}: ${id} isPinnedToToday=${isPinned}, todayOrder=${shortJson(note.todayOrder)}`,
+      );
+    }
+  }
+  for (const id of listed) {
+    if (!note.entities[id]) {
+      fail('today-notes:listed-missing', `${device}: ${id} is not a note`);
+    }
+  }
+};
 
 const checkPreservation = (
   snapshot: AppStateSnapshot,

@@ -45,6 +45,7 @@ import { SyncFuzzHarness } from './sync-fuzz-harness';
 export type Intent =
   | ['addTask', string, 'P' | 'T']
   | ['renameTask', string, string]
+  | ['editTaskNotes', string, string]
   | ['doneTask', string, boolean]
   | ['track', string, number]
   | ['deleteTask', string]
@@ -185,6 +186,13 @@ export const executeIntent = async (
       if (!task(id)) return undefined;
       await run(TaskSharedActions.updateTask({ task: { id, changes: { title } } }));
       return [{ entity: `task:${id}`, field: 'title', value: title }];
+    }
+    case 'editTaskNotes': {
+      // The task detail notes editor: TaskService.update(id, { notes }).
+      const [, id, notes] = intent;
+      if (!task(id)) return undefined;
+      await run(TaskSharedActions.updateTask({ task: { id, changes: { notes } } }));
+      return [{ entity: `task:${id}`, field: 'notes', value: notes }];
     }
     case 'doneTask': {
       const [, id, isDone] = intent;
@@ -379,6 +387,7 @@ export type IntentWeights = [Intent[0], number][];
 
 export const DEFAULT_WEIGHTS: IntentWeights = [
   ['renameTask', 3],
+  ['editTaskNotes', 2],
   ['track', 4],
   ['doneTask', 1],
   ['addTask', 1],
@@ -419,6 +428,9 @@ export const generateIntent = (
         return ['addTask', nextId('t'), random() < 0.5 ? 'P' : 'T'];
       case 'renameTask':
         if (t) return ['renameTask', t.id, label];
+        break;
+      case 'editTaskNotes':
+        if (t) return ['editTaskNotes', t.id, label];
         break;
       case 'doneTask':
         if (t) return ['doneTask', t.id, !t.isDone];

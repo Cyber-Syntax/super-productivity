@@ -43,6 +43,7 @@ const PROFILES: Record<string, IntentWeights> = {
   ),
   tasks: [
     ['renameTask', 3],
+    ['editTaskNotes', 2],
     ['track', 4],
     ['doneTask', 1],
   ],

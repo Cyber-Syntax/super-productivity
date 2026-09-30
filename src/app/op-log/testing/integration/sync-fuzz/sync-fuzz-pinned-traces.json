@@ -196,7 +196,11 @@
       }
     ],
     "primary": "field-reverted:note.isLock",
-    "signatures": ["divergence:.note.todayOrder.*", "field-reverted:note.isLock"],
+    "signatures": [
+      "divergence:.note.todayOrder.*",
+      "field-reverted:note.isLock",
+      "today-notes:listed-not-pinned"
+    ],
     "rejections": []
   },
   {
@@ -246,6 +250,92 @@
     ],
     "primary": "time-loss:task",
     "signatures": ["time-loss:task"],
+    "rejections": []
+  },
+  {
+    "class": "lww-update-skips-today-order",
+    "ref": "#10379",
+    "name": "a note unpinned on one device and edited later on another stays pinned but out of Today there",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "isPinnedToToday", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["editNote", "n1", "isPinnedToToday", false],
+        "s": 1
+      },
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "content", "A4"]
+      }
+    ],
+    "primary": "today-notes:pinned-not-listed",
+    "signatures": ["divergence:.note.todayOrder.*", "today-notes:pinned-not-listed"],
+    "rejections": []
+  },
+  {
+    "class": "lww-update-skips-today-order",
+    "ref": "#10379",
+    "name": "a note edited on one device and unpinned and edited later on another stays in Today there, unpinned",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "isPinnedToToday", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["editNote", "n1", "isPinnedToToday", false]
+      },
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "content", "A5"]
+      },
+      {
+        "d": "B",
+        "a": ["editNote", "n1", "content", "B6"]
+      }
+    ],
+    "primary": "today-notes:listed-not-pinned",
+    "signatures": ["divergence:.note.todayOrder.*", "today-notes:listed-not-pinned"],
+    "rejections": []
+  },
+  {
+    "class": "commuting-edit-beside-local-win",
+    "ref": "#10385",
+    "name": "a task notes edit downloaded beside a done toggle the device wins is lost on the writing device",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editTaskNotes", "t1", "A1"]
+      },
+      {
+        "d": "A",
+        "a": ["doneTask", "t1", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["track", "t1", 2000]
+      },
+      {
+        "d": "B",
+        "a": ["doneTask", "t1", true]
+      }
+    ],
+    "primary": "divergence:.task.entities.*.notes",
+    "signatures": ["divergence:.task.entities.*.notes", "field-reverted:task.notes"],
     "rejections": []
   },
   {
