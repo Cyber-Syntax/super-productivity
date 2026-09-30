@@ -40,10 +40,15 @@ export const SUPERSYNC_BASE_URL =
   process.env.SUPERSYNC_E2E_URL || 'http://localhost:1901';
 
 /**
- * Matches both `/api/sync/ops` uploads and `/api/sync/ops?...` downloads.
+ * Matches `/api/sync/ops` uploads and downloads. Every SuperSync request
+ * carries query parameters (downloads their cursor, all requests
+ * `appVersion`), so a glob without the trailing `*` matches nothing.
  * Do not add a trailing slash: the production endpoint has none.
  */
 const SUPERSYNC_OPS_ROUTE = '**/api/sync/ops*';
+
+/** Matches `/api/sync/snapshot` uploads, query parameters included. */
+export const SUPERSYNC_SNAPSHOT_ROUTE = '**/api/sync/snapshot*';
 
 export const routeSuperSyncOps = async (
   page: Page,

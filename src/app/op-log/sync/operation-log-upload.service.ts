@@ -35,6 +35,7 @@ import {
 import { isRetryableUploadError } from '@sp/sync-providers/http';
 import { getSyncErrorCode, handleStorageQuotaError } from './sync-error-utils';
 import {
+  ClientUpdateRequiredSPError,
   DecryptNoPasswordError,
   EncryptNoPasswordError,
 } from '../core/errors/sync-errors';
@@ -844,6 +845,12 @@ export class OperationLogUploadService {
       );
       return response;
     } catch (err) {
+      // The server refused this app version, not this op: turning the error into
+      // a result would classify the full-state op as rejected. Re-throw, as for
+      // a missing encryption key, so it stays pending until the app is updated.
+      if (err instanceof ClientUpdateRequiredSPError) {
+        throw err;
+      }
       const message = err instanceof Error ? err.message : 'Unknown error';
       OpLog.error(`OperationLogUploadService: Snapshot upload failed: ${message}`);
       handleStorageQuotaError(err);
