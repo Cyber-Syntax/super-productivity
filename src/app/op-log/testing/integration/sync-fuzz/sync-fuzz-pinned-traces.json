@@ -1,0 +1,713 @@
+[
+  {
+    "class": "reorder-wedge",
+    "ref": "#10377",
+    "name": "two concurrent habit reorders stop the second device",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["reorderHabits", 1, 2]
+      },
+      {
+        "d": "B",
+        "a": ["reorderHabits", 5, 0]
+      }
+    ],
+    "primary": "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order",
+    "signatures": [
+      "divergence:.simpleCounter.ids.*",
+      "pending",
+      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "reorder-wedge",
+    "ref": "#10377",
+    "name": "a device stopped by competing habit reorders never uploads a task it adds",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["reorderHabits", 1, 2]
+      },
+      {
+        "d": "B",
+        "a": ["reorderHabits", 5, 0]
+      },
+      {
+        "d": "B",
+        "a": ["addTask", "t13", "P"]
+      }
+    ],
+    "primary": "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order",
+    "signatures": [
+      "divergence:.project.entities.*.taskIds.*",
+      "divergence:.simpleCounter.ids.*",
+      "divergence:.task.entities.*",
+      "divergence:.task.ids.*",
+      "lost-entity:task",
+      "pending",
+      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "reorder-wedge",
+    "ref": "#10377",
+    "name": "a project note reorder crossing a delete stops the deleting device",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["deleteNote", "n1"]
+      },
+      {
+        "d": "A",
+        "a": ["reorderNotes", "P", 3, 0]
+      }
+    ],
+    "primary": "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[Note] Update Note Order",
+    "signatures": [
+      "divergence:.note.entities.*",
+      "divergence:.note.ids.*",
+      "divergence:.project.entities.*.noteIds.*",
+      "pending",
+      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[Note] Update Note Order"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "remote-win-keeps-local-edit",
+    "ref": "#10260",
+    "name": "a note content edit that loses to an unpin stays on its device only",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "isPinnedToToday", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "a": ["editNote", "n1", "content", "C17"]
+      },
+      {
+        "d": "B",
+        "a": ["editNote", "n1", "isPinnedToToday", false]
+      }
+    ],
+    "primary": "divergence:.note.entities.*.content",
+    "signatures": ["divergence:.note.entities.*.content", "field-reverted:note.content"],
+    "rejections": []
+  },
+  {
+    "class": "remote-win-keeps-local-edit",
+    "ref": "#10260",
+    "name": "a habit rename that loses to a count stays on its device only",
+    "steps": [
+      {
+        "d": "C",
+        "a": ["editHabit", "h1", "title", "C24"]
+      },
+      {
+        "d": "A",
+        "a": ["countHabit", "h1"]
+      }
+    ],
+    "primary": "divergence:.simpleCounter.entities.*.title",
+    "signatures": [
+      "divergence:.simpleCounter.entities.*.title",
+      "field-reverted:habit.title"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "remote-win-keeps-local-edit",
+    "ref": "#10260",
+    "name": "a task rename that loses to tracking stays on its device only",
+    "steps": [
+      {
+        "d": "C",
+        "a": ["addTask", "t13", "P"],
+        "s": 1
+      },
+      {
+        "d": "A",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "a": ["renameTask", "t13", "C18"]
+      },
+      {
+        "d": "A",
+        "a": ["track", "t13", 2000]
+      }
+    ],
+    "primary": "divergence:.task.entities.*.title",
+    "signatures": ["divergence:.task.entities.*.title", "field-reverted:task.title"],
+    "rejections": []
+  },
+  {
+    "class": "whole-entity-lww-drops-fields",
+    "ref": "#10379",
+    "name": "a habit count is lost to a concurrent rename",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["countHabit", "h1"]
+      },
+      {
+        "d": "C",
+        "a": ["editHabit", "h1", "title", "C26"]
+      }
+    ],
+    "primary": "field-reverted:habit.countOnDay",
+    "signatures": ["field-reverted:habit.countOnDay"],
+    "rejections": []
+  },
+  {
+    "class": "whole-entity-lww-drops-fields",
+    "ref": "#10379",
+    "name": "a note lock is lost to a concurrent unpin",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "isPinnedToToday", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "isLock", true]
+      },
+      {
+        "d": "B",
+        "a": ["editNote", "n1", "isPinnedToToday", false]
+      }
+    ],
+    "primary": "field-reverted:note.isLock",
+    "signatures": ["divergence:.note.todayOrder.*", "field-reverted:note.isLock"],
+    "rejections": []
+  },
+  {
+    "class": "whole-entity-lww-drops-fields",
+    "ref": "#10379",
+    "name": "done status is lost when both devices also rename the task",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["doneTask", "t2", true]
+      },
+      {
+        "d": "A",
+        "a": ["renameTask", "t2", "A27"]
+      },
+      {
+        "d": "C",
+        "a": ["renameTask", "t2", "C28"]
+      }
+    ],
+    "primary": "field-reverted:task.isDone",
+    "signatures": ["field-reverted:task.isDone"],
+    "rejections": ["CONFLICT_CONCURRENT [TASK] LWW Update"]
+  },
+  {
+    "class": "whole-entity-lww-drops-fields",
+    "ref": "#10379",
+    "name": "tracked time is lost to a later concurrent rename",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["renameTask", "t2", "A2"]
+      },
+      {
+        "d": "C",
+        "a": ["renameTask", "t2", "C14"],
+        "s": 1
+      },
+      {
+        "d": "A",
+        "a": ["track", "t2", 3000]
+      },
+      {
+        "d": "C",
+        "a": ["renameTask", "t2", "C29"]
+      }
+    ],
+    "primary": "time-loss:task",
+    "signatures": ["time-loss:task"],
+    "rejections": []
+  },
+  {
+    "class": "auto-plan-blocks-delta-merge",
+    "ref": "#10378",
+    "name": "two devices tracking one unscheduled task lose one device's time",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["track", "t3", 3000]
+      },
+      {
+        "d": "A",
+        "a": ["track", "t3", 2000]
+      }
+    ],
+    "primary": "divergence:.task.entities.*.timeSpentOnDay.*",
+    "signatures": [
+      "divergence:.task.entities.*.timeSpent",
+      "divergence:.task.entities.*.timeSpentOnDay.*",
+      "time-loss:task"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "note-recreated-without-content",
+    "ref": "#10380",
+    "name": "a note deleted on one device and locked on another comes back invalid",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["deleteNote", "n1"]
+      },
+      {
+        "d": "C",
+        "a": ["editNote", "n1", "isLock", true],
+        "s": 1
+      }
+    ],
+    "primary": "validation:state invalid after sync",
+    "signatures": [
+      "divergence:.note.entities.*.content",
+      "divergence:.note.entities.*.created",
+      "divergence:.project.entities.*.noteIds.*",
+      "validation:state invalid after sync"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "delete-vs-delta-recreate",
+    "ref": "#10380",
+    "name": "a task deleted while another device tracks it comes back without the time, with the delta arguments as fields",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["deleteTask", "t1"]
+      },
+      {
+        "d": "B",
+        "a": ["track", "t1", 2000],
+        "s": 1
+      }
+    ],
+    "primary": "divergence:.task.entities.*.taskId",
+    "signatures": [
+      "divergence:.task.entities.*.date",
+      "divergence:.task.entities.*.duration",
+      "divergence:.task.entities.*.subTasks",
+      "divergence:.task.entities.*.taskId",
+      "divergence:.task.entities.*.timeSpent",
+      "divergence:.task.entities.*.timeSpentOnDay",
+      "divergence:.task.ids.*"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "list-order-divergence",
+    "ref": "#10381",
+    "name": "a task recreated after delete-vs-rename sits at different project positions",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["deleteTask", "t3"]
+      },
+      {
+        "d": "C",
+        "a": ["renameTask", "t3", "C29"]
+      }
+    ],
+    "primary": "divergence:.project.entities.*.taskIds.*",
+    "signatures": [
+      "divergence:.project.entities.*.taskIds.*",
+      "restart-changed:.project.entities.*.taskIds.*"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "restart-changes-state",
+    "ref": "#10381",
+    "name": "after a delete, a recreate and concurrent renames, a restart changes the time and title",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["deleteTask", "t2"]
+      },
+      {
+        "d": "A",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "a": ["renameTask", "t2", "C8"],
+        "s": 1
+      },
+      {
+        "d": "A",
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["renameTask", "t2", "B13"]
+      },
+      {
+        "d": "A",
+        "a": ["track", "t2", 3000]
+      },
+      {
+        "d": "B",
+        "s": 1
+      }
+    ],
+    "primary": "restart-changed:.task.entities.*.title",
+    "signatures": [
+      "divergence:.project.entities.*.taskIds.*",
+      "divergence:.tag.entities.*.taskIds.*",
+      "divergence:.task.entities.*.timeSpent",
+      "divergence:.task.entities.*.timeSpentOnDay",
+      "divergence:.task.entities.*.title",
+      "divergence:.task.ids.*",
+      "restart-changed:.project.entities.*.taskIds.*",
+      "restart-changed:.tag.entities.*.taskIds.*",
+      "restart-changed:.task.entities.*.timeSpent",
+      "restart-changed:.task.entities.*.timeSpentOnDay",
+      "restart-changed:.task.entities.*.title",
+      "restart-changed:.task.ids.*"
+    ],
+    "rejections": ["CONFLICT_CONCURRENT [TASK] LWW Update"]
+  },
+  {
+    "class": "list-order-divergence",
+    "ref": "#10382",
+    "name": "two devices adding a habit end with different habit orders",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["addHabit", "h14"]
+      },
+      {
+        "d": "C",
+        "a": ["addHabit", "h16"]
+      }
+    ],
+    "primary": "divergence:.simpleCounter.ids.*",
+    "signatures": ["divergence:.simpleCounter.ids.*"],
+    "rejections": []
+  },
+  {
+    "class": "reorder-kept-stop",
+    "ref": "kept stop by design: #10364 admission matrix (\"Kept stop\"); fallback proposal #10342",
+    "name": "Today note reorder crossing an unpin stops the unpinning device",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "isPinnedToToday", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "a": ["editNote", "n1", "isPinnedToToday", false]
+      },
+      {
+        "d": "B",
+        "a": ["reorderNotes", "T", 0, 1],
+        "s": 1
+      }
+    ],
+    "primary": "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[Note] Update Note Order",
+    "signatures": [
+      "divergence:.note.entities.*.isPinnedToToday",
+      "divergence:.note.todayOrder.*",
+      "pending",
+      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[Note] Update Note Order"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "reorder-crossing",
+    "ref": "fixed by #10364 (regression pin)",
+    "name": "a project note reorder crossing a pin converges",
+    "steps": [
+      {
+        "d": "C",
+        "a": ["reorderNotes", "P", 6, 3]
+      },
+      {
+        "d": "C",
+        "s": 1
+      },
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "isPinnedToToday", true]
+      }
+    ],
+    "signatures": [],
+    "rejections": ["CONFLICT_CONCURRENT [Note] Update Note"]
+  },
+  {
+    "class": "reorder-crossing",
+    "ref": "fixed by #10364 (regression pin)",
+    "name": "a habit reorder crossing a rename converges",
+    "steps": [
+      {
+        "d": "C",
+        "a": ["editHabit", "STRETCHING_COUNTER", "isEnabled", true]
+      },
+      {
+        "d": "B",
+        "a": ["editHabit", "STRETCHING_COUNTER", "title", "B6"]
+      },
+      {
+        "d": "C",
+        "a": ["reorderHabits", 0, 1],
+        "s": 1
+      }
+    ],
+    "signatures": [],
+    "rejections": ["CONFLICT_CONCURRENT [SIMPLE_COUNTER] LWW Update"]
+  },
+  {
+    "class": "reorder-crossing",
+    "ref": "fixed by #10364 (regression pin)",
+    "name": "a pending habit reorder crossing a rename converges",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editHabit", "h3", "title", "A6"]
+      },
+      {
+        "d": "C",
+        "a": ["editHabit", "h1", "isEnabled", false]
+      },
+      {
+        "d": "C",
+        "a": ["reorderHabits", 5, 0]
+      }
+    ],
+    "signatures": [],
+    "rejections": ["CONFLICT_CONCURRENT [SimpleCounter] Update SimpleCounter Order"]
+  },
+  {
+    "class": "reorder-crossing",
+    "ref": "fixed by #10364 (regression pin)",
+    "name": "a pending habit reorder crossing a disable converges and uploads the device's new task",
+    "steps": [
+      {
+        "d": "C",
+        "a": ["addTask", "t13", "P"]
+      },
+      {
+        "d": "A",
+        "a": ["editHabit", "h1", "isEnabled", false]
+      },
+      {
+        "d": "C",
+        "a": ["reorderHabits", 3, 4]
+      }
+    ],
+    "signatures": [],
+    "rejections": ["CONFLICT_CONCURRENT [SimpleCounter] Update SimpleCounter Order"]
+  },
+  {
+    "class": "time-delta-crossing",
+    "ref": "fixed by #10340 (regression pin)",
+    "name": "a pending delta crossing a rename keeps every device's time",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["renameTask", "t2", "B0"],
+        "s": 1
+      },
+      {
+        "d": "C",
+        "a": ["track", "t2", 1000]
+      },
+      {
+        "d": "A",
+        "a": ["track", "t2", 1000]
+      }
+    ],
+    "signatures": [],
+    "rejections": ["CONFLICT_CONCURRENT [TimeTracking] Sync time spent"]
+  },
+  {
+    "class": "time-delta-crossing",
+    "ref": "fixed by #10340 (regression pin)",
+    "name": "the #10340 E2E pending-delta shape converges",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["track", "t1", 3000]
+      },
+      {
+        "d": "C",
+        "a": ["track", "t1", 5000]
+      },
+      {
+        "d": "B",
+        "a": ["renameTask", "t1", "B2"],
+        "s": 1
+      },
+      {
+        "d": "A",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "s": 1
+      }
+    ],
+    "signatures": [],
+    "rejections": ["CONFLICT_CONCURRENT [TimeTracking] Sync time spent"]
+  },
+  {
+    "class": "time-delta-crossing",
+    "ref": "fixed by #10340 (regression pin)",
+    "name": "the #10340 E2E pending-rename shape converges",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["renameTask", "t1", "B0"]
+      },
+      {
+        "d": "C",
+        "a": ["track", "t1", 5000]
+      },
+      {
+        "d": "A",
+        "a": ["track", "t1", 3000],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "s": 1
+      }
+    ],
+    "signatures": [],
+    "rejections": [
+      "CONFLICT_CONCURRENT [Task Shared] updateTask",
+      "CONFLICT_CONCURRENT [TimeTracking] Sync time spent"
+    ]
+  },
+  {
+    "class": "coverage",
+    "ref": "coverage trace: no known bug",
+    "name": "a task archived on one device and restored on another converges across compactions and restarts",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["doneTask", "t3", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["archiveTask", "t3"],
+        "s": 1
+      },
+      {
+        "d": "C",
+        "s": 1,
+        "c": 1
+      },
+      {
+        "d": "C",
+        "a": ["restoreTask", "t3"],
+        "s": 1,
+        "r": 1
+      },
+      {
+        "d": "A",
+        "a": ["addNote", "n11", "P"],
+        "s": 1,
+        "c": 1
+      },
+      {
+        "d": "B",
+        "s": 1,
+        "r": 1
+      }
+    ],
+    "signatures": [],
+    "rejections": []
+  },
+  {
+    "class": "coverage",
+    "ref": "coverage trace: no known bug",
+    "name": "ops made before a compaction and a restart upload and converge",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["addTask", "t12", "P"],
+        "c": 1
+      },
+      {
+        "d": "B",
+        "a": ["renameTask", "t12", "B1"],
+        "r": 1
+      },
+      {
+        "d": "C",
+        "a": ["track", "t1", 2000],
+        "s": 1,
+        "c": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "A",
+        "a": ["editNote", "n2", "content", "A4"],
+        "s": 1,
+        "r": 1
+      },
+      {
+        "d": "C",
+        "a": ["addNote", "n13", "T"],
+        "s": 1
+      },
+      {
+        "d": "A",
+        "a": ["renameTask", "t1", "A6"],
+        "s": 1,
+        "c": 1
+      }
+    ],
+    "signatures": [],
+    "rejections": []
+  }
+]
