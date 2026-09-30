@@ -70,13 +70,28 @@ test.describe('@webdav stale monolith #10256', () => {
         isUseSplitSyncFiles,
       };
       const contexts: BrowserContext[] = [];
-      const client = async (): Promise<{
+      const client = async (
+        options: { installClock?: boolean } = {},
+      ): Promise<{
         page: Page;
         sync: SyncPage;
         work: WorkViewPage;
       }> => {
         const { context, page } = await setupSyncClient(browser, baseURL);
         contexts.push(context);
+        if (options.installClock) {
+          // page.clock injects its fake Date at the Unix epoch and applies the
+          // requested time in a later evaluation. On a running app the day-change
+          // tick can read 1970-01-01 in between and persist a TODAY repair op, so
+          // install the clock (at the real time) before the app boots.
+          await page.route('**/clock-setup-stale-monolith', (route) =>
+            route.fulfill({ contentType: 'text/html', body: '<html></html>' }),
+          );
+          await page.goto('/clock-setup-stale-monolith');
+          await page.clock.install();
+          await page.goto('/');
+          await waitForAppReady(page);
+        }
         const work = new WorkViewPage(page);
         await work.waitForTaskList();
         const sync = new SyncPage(page);
@@ -115,7 +130,8 @@ test.describe('@webdav stale monolith #10256', () => {
             remoteUrl = req.url();
           }
         });
-        const b = await client();
+        // Only B's clock jumps (below), and only without a first sync.
+        const b = await client({ installClock: !firstSync });
         if (!firstSync) {
           await a.work.addTask('Shared baseline');
           await a.sync.setupWebdavSync(config);
