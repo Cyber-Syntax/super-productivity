@@ -1,8 +1,7 @@
 # Design note: LWW resolutions that carry only the fields that must win
 
-**Status:** proposal, 2026-09-30. Nothing here is implemented. @johannesjo
-decides (see [Decisions](#decisions-for-johannesjo)). Tracker: #10393, queue
-item 1. Findings: #10382.
+**Status:** decided 2026-09-30 (see [Outcome](#outcome)). Option A is not
+implemented. Tracker: #10393, queue item 1. Findings: #10382.
 
 ## Problem
 
@@ -283,3 +282,20 @@ reproduction.
 7. **Time on a remote win:** re-apply the rebased local delta after a winning
    replace snapshot, or accept that #10378 is fixed only in the local-win
    direction?
+
+## Outcome
+
+Decided by @johannesjo on 2026-09-30 ([#10393](https://github.com/super-productivity/super-productivity/issues/10393)):
+
+1. **A, later and separately.** #10385 does not wait for it: the local-win
+   snapshot now carries the readable fields of the same batch's
+   nonconflicting task updates (`buildTimeAwareResolutionBatches`), the way
+   it already carried their time. Opaque ops still take the pre-batch read.
+2. **Recreate from a patch:** accepted as a residual; the fuzz harness should
+   count it.
+3. **Clears:** accepted, with a sunset. When A starts, weigh keeping
+   `'replace'` for resolutions that clear `reminderId` or `dueWithTime`.
+4. **NOTE:** not admitted until v19.1.0 has left the fleet.
+5. **Resolution ops as input:** no; the no-re-merge contract stays.
+6. **Opaque ops:** stay on whole-entity LWW.
+7. **Time on a remote win:** local-win direction only, for now.
