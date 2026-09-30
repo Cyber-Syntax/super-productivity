@@ -581,9 +581,11 @@ export class ProjectPage extends BasePage {
 
     const dialog = this.page.locator('dialog-fullscreen-markdown');
     const noteEditor = markdownEditor(dialog);
-    if (!(await noteEditor.isVisible({ timeout: 2000 }).catch(() => false))) {
-      throw new Error('Note dialog markdown editor not found');
-    }
+    // The editor is a deferred chunk that can render after the dialog. isVisible()
+    // ignores its timeout and returns at once, so wait for it instead.
+    await noteEditor.waitFor({ state: 'visible', timeout: 10000 }).catch((e: unknown) => {
+      throw new Error(`Note dialog markdown editor not found: ${String(e)}`);
+    });
 
     await fillMarkdownEditor(dialog, noteContent);
 
