@@ -13,6 +13,7 @@ import {
   EncryptNoPasswordError,
 } from '../core/errors/sync-errors';
 import { ActionType, OpType, OperationLogEntry } from '../core/operation.types';
+import { SupersededOperationResolverService } from './superseded-operation-resolver.service';
 import { SnackService } from '../../core/snack/snack.service';
 import { provideMockStore } from '@ngrx/store/testing';
 import { StateSnapshotService } from '../backup/state-snapshot.service';
@@ -22,6 +23,7 @@ describe('OperationLogUploadService', () => {
   let mockOpLogStore: jasmine.SpyObj<OperationLogStoreService>;
   let mockLockService: jasmine.SpyObj<LockService>;
   let mockStateSnapshotService: jasmine.SpyObj<StateSnapshotService>;
+  let mockResolver: jasmine.SpyObj<SupersededOperationResolverService>;
 
   const createMockEntry = (
     seq: number,
@@ -73,9 +75,18 @@ describe('OperationLogUploadService', () => {
     mockOpLogStore.markSynced.and.returnValue(Promise.resolve());
     mockOpLogStore.deleteOpsWhere.and.returnValue(Promise.resolve());
 
+    mockResolver = jasmine.createSpyObj('SupersededOperationResolverService', [
+      'reissueCrossedPendingReorders',
+    ]);
+    mockResolver.reissueCrossedPendingReorders.and.resolveTo({
+      created: 0,
+      deferredOpIds: [],
+    });
+
     TestBed.configureTestingModule({
       providers: [
         OperationLogUploadService,
+        { provide: SupersededOperationResolverService, useValue: mockResolver },
         provideMockStore(),
         { provide: OperationLogStoreService, useValue: mockOpLogStore },
         { provide: LockService, useValue: mockLockService },
@@ -140,6 +151,57 @@ describe('OperationLogUploadService', () => {
         (mockApiProvider.supportsCausalRepairSnapshots as jasmine.Spy).and.returnValue(
           true,
         );
+      });
+
+      describe('crossed pending orders (#10377)', () => {
+        const orderEntry = (seq: number, id: string): OperationLogEntry => ({
+          ...createMockEntry(seq, id, 'client-1'),
+          op: {
+            ...createMockEntry(seq, id, 'client-1').op,
+            actionType: ActionType.NOTE_UPDATE_ORDER,
+            opType: OpType.Move,
+            entityType: 'NOTE',
+            entityId: 'n1',
+            entityIds: ['n1', 'n2'],
+            payload: {
+              actionPayload: {
+                ids: ['n1', 'n2'],
+                activeContextType: 'PROJECT',
+                activeContextId: 'p1',
+              },
+              entityChanges: [],
+            },
+          },
+        });
+
+        it('reissues first and holds back an order whose reissue must wait', async () => {
+          mockOpLogStore.getUnsynced.and.resolveTo([
+            orderEntry(1, 'order-1'),
+            createMockEntry(2, 'op-2', 'client-1'),
+          ]);
+          mockResolver.reissueCrossedPendingReorders.and.resolveTo({
+            created: 0,
+            deferredOpIds: ['order-1'],
+          });
+
+          await service.uploadPendingOps(mockApiProvider);
+
+          expect(mockResolver.reissueCrossedPendingReorders).toHaveBeenCalledTimes(1);
+          const uploaded = mockApiProvider.uploadOps.calls
+            .allArgs()
+            .flatMap(([ops]) => ops.map((op) => op.id));
+          expect(uploaded).toEqual(['op-2']);
+        });
+
+        it('does not look for crossings without a pending order', async () => {
+          mockOpLogStore.getUnsynced.and.resolveTo([
+            createMockEntry(1, 'op-1', 'client-1'),
+          ]);
+
+          await service.uploadPendingOps(mockApiProvider);
+
+          expect(mockResolver.reissueCrossedPendingReorders).not.toHaveBeenCalled();
+        });
       });
 
       it('should use API upload for operation-sync-capable providers', async () => {

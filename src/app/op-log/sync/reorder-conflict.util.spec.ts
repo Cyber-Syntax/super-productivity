@@ -2,6 +2,7 @@ import { Action, ActionReducer, MetaReducer } from '@ngrx/store';
 import { Note } from '../../features/note/note.model';
 import {
   addNote,
+  deleteNote,
   updateNote,
   updateNoteOrder,
 } from '../../features/note/store/note.actions';
@@ -27,6 +28,7 @@ import {
 } from '../../features/simple-counter/simple-counter.model';
 import {
   addSimpleCounter,
+  deleteSimpleCounter,
   setSimpleCounterCounterForDate,
   setSimpleCounterCounterToday,
   updateSimpleCounter,
@@ -67,7 +69,11 @@ import { RootState } from '../../root-store/root-state';
 import { operationCaptureMetaReducer } from '../capture/operation-capture.meta-reducer';
 import { Operation } from '../core/operation.types';
 import { PersistentAction } from '../core/persistent-action.interface';
-import { areCommutingReorderAndContentOperations } from './reorder-conflict.util';
+import {
+  areCommutingReorderAndContentOperations,
+  isReissuedReorderCrossing,
+  selectCrossedPendingReorders,
+} from './reorder-conflict.util';
 
 /**
  * Pins the one reorder rule to what the reducers write. Every field of every
@@ -524,5 +530,134 @@ describe('reorder rule against the real reducers', () => {
         entityType: 'SIMPLE_COUNTER',
       }),
     ).toBe(false);
+  });
+});
+
+describe('reissued reorder crossings (#10377)', () => {
+  let base: State;
+  beforeAll(() => {
+    base = buildBase();
+  });
+  const noteOrder = (ids: string[], contextId: string): PersistentAction =>
+    updateNoteOrder({
+      ids,
+      activeContextType: contextId === P ? WorkContextType.PROJECT : WorkContextType.TAG,
+      activeContextId: contextId,
+    });
+  const deleteA = deleteNote({ id: 'a', projectId: P, isPinnedToToday: true });
+  const lists = [
+    {
+      name: 'project notes',
+      order: noteOrder(['b', 'a', 'w'], P),
+      // The last one orders the other note list.
+      competing: [noteOrder(['w', 'a', 'b'], P), noteOrder(['a', 'b', 't'], 'TODAY')],
+      unrelated: [
+        noteOrder(['x', 'y'], OTHER_PROJECT),
+        updateSimpleCounterOrder({ ids: ['b', 'a', 'u'] }),
+        BoardsActions.sortBoards({ ids: ['a', 'b'] }),
+      ],
+      list: (s: State): string[] => s.projects.entities[P]!.noteIds,
+    },
+    {
+      name: 'Today notes',
+      order: noteOrder(['a', 'b', 't'], 'TODAY'),
+      // Every tag view reorders note.todayOrder too.
+      competing: [
+        noteOrder(['b', 't', 'a'], 'TODAY'),
+        noteOrder(['t', 'a', 'b'], 'tag1'),
+        noteOrder(['b', 'a', 'w'], P),
+      ],
+      unrelated: [updateSimpleCounterOrder({ ids: ['b', 'a', 'u'] })],
+      list: (s: State): string[] => s.note.todayOrder,
+    },
+  ];
+  for (const { name, order, competing, unrelated, list } of lists) {
+    it(`${name}: admits other note orders and a listed delete, in both roles`, () => {
+      const orderOp = toOp(order);
+      for (const other of [...competing.map(toOp), toOp(deleteA)]) {
+        expect(isReissuedReorderCrossing(orderOp, other)).toBeTrue();
+        expect(isReissuedReorderCrossing(other, orderOp)).toBeTrue();
+      }
+      for (const other of unrelated.map(toOp)) {
+        expect(isReissuedReorderCrossing(orderOp, other)).toBeFalse();
+      }
+      const unlisted = deleteNote({ id: 'x', projectId: P, isPinnedToToday: true });
+      expect(isReissuedReorderCrossing(orderOp, toOp(unlisted))).toBeFalse();
+    });
+
+    it(`${name}: an order of the other note list commutes with it`, () => {
+      const other = competing[competing.length - 1];
+      const both = apply(base, [order, other]);
+      expect(apply(base, [other, order])).toEqual(both);
+      expect(list(both)).toEqual(list(apply(base, [order])));
+    });
+
+    it(`${name}: a delete and the order commute, dropping the deleted id`, () => {
+      const deletedFirst = apply(base, [deleteA, order]);
+      expect(list(deletedFirst)).not.toContain('a');
+      expect(deletedFirst).toEqual(apply(base, [order, deleteA]));
+    });
+  }
+
+  it('admits competing habit orders but not a habit delete', () => {
+    const order = toOp(updateSimpleCounterOrder({ ids: ['b', 'a', 'u'] }));
+    const other = toOp(updateSimpleCounterOrder({ ids: ['u', 'b', 'a'] }));
+    const del = toOp(deleteSimpleCounter({ id: 'a' }));
+    expect(isReissuedReorderCrossing(order, other)).toBeTrue();
+    // Different habit sets (a habit added, enabled or disabled on one device)
+    // fill different slots on each side: they keep the stop.
+    const withAdded = toOp(updateSimpleCounterOrder({ ids: ['new', 'b', 'a', 'u'] }));
+    expect(isReissuedReorderCrossing(order, withAdded)).toBeFalse();
+    expect(isReissuedReorderCrossing(withAdded, order)).toBeFalse();
+    expect(isReissuedReorderCrossing(order, del)).toBeFalse();
+    expect(isReissuedReorderCrossing(del, order)).toBeFalse();
+    // The habit order fills the slots of the habits it lists; a delete of a
+    // listed habit shifts them around an unlisted (disabled) one.
+    const deleteHabit = deleteSimpleCounter({ id: 'a' });
+    const reorder = updateSimpleCounterOrder({ ids: ['b', 'a', 'u'] });
+    expect(apply(base, [deleteHabit, reorder]).simpleCounter.ids).not.toEqual(
+      apply(base, [reorder, deleteHabit]).simpleCounter.ids,
+    );
+  });
+
+  it('refuses boards, sections, providers and bulk deletes', () => {
+    const pairs: [PersistentAction, PersistentAction][] = [
+      [
+        BoardsActions.sortBoards({ ids: ['a', 'b'] }),
+        BoardsActions.sortBoards({ ids: ['b', 'a'] }),
+      ],
+      [
+        updateSectionOrder({ contextId: P, ids: ['alpha', 'beta'] }),
+        updateSectionOrder({ contextId: P, ids: ['beta', 'alpha'] }),
+      ],
+      [
+        IssueProviderActions.sortIssueProvidersFirst({ ids: ['a', 'b'] }),
+        IssueProviderActions.sortIssueProvidersFirst({ ids: ['b', 'a'] }),
+      ],
+    ];
+    for (const [first, second] of pairs) {
+      expect(isReissuedReorderCrossing(toOp(first), toOp(second))).toBeFalse();
+    }
+    const order = toOp(noteOrder(['b', 'a', 'w'], P));
+    const bulk = { ...toOp(deleteA), entityIds: ['a', 'b'] };
+    expect(isReissuedReorderCrossing(order, bulk)).toBeFalse();
+  });
+
+  it('selects each pending order with the last concurrent crossing as proof', () => {
+    const pending = { ...toOp(noteOrder(['b', 'a', 'w'], P)), vectorClock: { local: 1 } };
+    const edit = {
+      ...toOp(updateNote({ note: { id: 'a', changes: { content: 'x' } } })),
+    };
+    const first = { ...toOp(noteOrder(['w', 'a', 'b'], P)), vectorClock: { remote: 1 } };
+    const second = { ...toOp(deleteA), vectorClock: { remote: 2 } };
+    const seen = {
+      ...toOp(noteOrder(['a', 'b', 'w'], P)),
+      vectorClock: { local: 1, remote: 3 },
+    };
+    expect(selectCrossedPendingReorders([pending, edit], [first, second, edit])).toEqual([
+      { opId: pending.id, op: pending, existingClock: second.vectorClock },
+    ]);
+    // A remote op that already saw the pending order does not cross it.
+    expect(selectCrossedPendingReorders([pending], [seen])).toEqual([]);
   });
 });

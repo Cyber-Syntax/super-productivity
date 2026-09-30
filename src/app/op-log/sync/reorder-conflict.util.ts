@@ -10,8 +10,10 @@ import {
   isMultiEntityPayload,
   Operation,
   OpType,
+  VectorClock,
 } from '../core/operation.types';
 import { getOpEntityIds } from '../util/get-op-entity-ids.util';
+import { compareVectorClocks, VectorClockComparison } from '../../core/util/vector-clock';
 import {
   SectionReplayProjection,
   SectionReplaySnapshot,
@@ -220,6 +222,90 @@ export const areCommutingReorderAndContentOperations = (
 ): boolean =>
   (isReorderAndEdit(a, b) || isReorderAndEdit(b, a)) &&
   !(writesTodayOrder(b) && pending.some((op) => op !== b && writesTodayOrder(op)));
+
+/**
+ * #10377: crossings of a reorder that converge once the remote op applies and
+ * the pending reorder is reissued from current state
+ * (`projectReorderConflictAgainstState`) with a clock that dominates both:
+ * - a competing reorder of the same list: the list as it stands after the
+ *   remote order (either device's order may win, #10264). Two habit orders
+ *   must list the same habits;
+ * - a note order of the other list (a project's `noteIds` against
+ *   `note.todayOrder`): each writes only its own list, so they commute; and
+ * - the delete of a note the reorder lists: the delete wins and the reissued
+ *   list keeps the reorder's positions of the other notes. Both note lists
+ *   keep only ids already in the list, so a delete commutes with a note order.
+ * Every Today and tag view writes `note.todayOrder`, so their orders compete.
+ * A habit order fills the slots of the habits it lists, so a habit delete
+ * shifts them around an unlisted (disabled) habit: it keeps the stop.
+ */
+const REISSUED_REORDER_DELETES = new Map<ActionType, ActionType | undefined>([
+  [ActionType.NOTE_UPDATE_ORDER, ActionType.NOTE_DELETE],
+  [ActionType.COUNTER_UPDATE_ORDER, undefined],
+]);
+
+const reissuedListOf = (op: Operation): string | undefined => {
+  if (!REISSUED_REORDER_DELETES.has(op.actionType) || !isContentReorderOperation(op))
+    return undefined;
+  const p = payloadOf(op);
+  return op.actionType !== ActionType.NOTE_UPDATE_ORDER
+    ? op.actionType
+    : p['activeContextType'] === WorkContextType.PROJECT
+      ? JSON.stringify([op.actionType, p['activeContextId']])
+      : JSON.stringify([op.actionType, 'todayOrder']);
+};
+
+/** A note or habit order that a crossing can reissue. */
+export const isReissuableReorder = (op: Operation): boolean => !!reissuedListOf(op);
+
+const isListedDelete = (order: Operation, op: Operation): boolean =>
+  REISSUED_REORDER_DELETES.get(order.actionType) === op.actionType &&
+  op.opType === OpType.Delete &&
+  op.entityType === order.entityType &&
+  !!op.entityId &&
+  getOpEntityIds(op).length === 1 &&
+  getOpEntityIds(order).includes(op.entityId);
+
+/** Whether `a` and `b` cross as two note or habit orders, or an order and a delete. */
+export const isReissuedReorderCrossing = (a: Operation, b: Operation): boolean => {
+  const listA = reissuedListOf(a);
+  const listB = reissuedListOf(b);
+  if (listA && listB) {
+    const idsA = getOpEntityIds(a);
+    const idsB = getOpEntityIds(b);
+    // A habit order fills the slots of its own habits: two orders over
+    // different habit sets place them differently on each side.
+    return a.actionType === ActionType.COUNTER_UPDATE_ORDER
+      ? b.actionType === a.actionType &&
+          idsA.length === idsB.length &&
+          idsA.every((id) => idsB.includes(id))
+      : a.actionType === b.actionType && idsA.some((id) => idsB.includes(id));
+  }
+  return (!!listA && isListedDelete(a, b)) || (!!listB && isListedDelete(b, a));
+};
+
+/**
+ * The pending reorders that crossed one of the applied remote ops, each with
+ * the clock of the last such op as the proof the resolver requires. File-based
+ * providers never reject an upload, so the reorder is reissued at download time
+ * on every provider instead of waiting for a server rejection.
+ */
+export const selectCrossedPendingReorders = (
+  pending: Operation[],
+  applied: Operation[],
+): { opId: string; op: Operation; existingClock: VectorClock }[] =>
+  pending.flatMap((op) => {
+    if (!isReissuableReorder(op)) return [];
+    const crossing = [...applied]
+      .reverse()
+      .find(
+        (remote) =>
+          isReissuedReorderCrossing(op, remote) &&
+          compareVectorClocks(op.vectorClock, remote.vectorClock) ===
+            VectorClockComparison.CONCURRENT,
+      );
+    return crossing ? [{ opId: op.id, op, existingClock: crossing.vectorClock }] : [];
+  });
 
 const entityOf = (
   snapshot: ReorderReplaySnapshot,

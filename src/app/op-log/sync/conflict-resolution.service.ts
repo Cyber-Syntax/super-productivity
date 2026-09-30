@@ -117,7 +117,10 @@ import {
 } from './conflict-disjoint-merge.util';
 import { RECREATE_FALLBACK } from '../core/recreate-fallback.const';
 import { areCommutingSectionOperations } from './section-conflict-commutativity.util';
-import { areCommutingReorderAndContentOperations } from './reorder-conflict.util';
+import {
+  areCommutingReorderAndContentOperations,
+  isReissuedReorderCrossing,
+} from './reorder-conflict.util';
 import { asPatchSnapshotIfTypeShadowed } from './lww-snapshot-patch-mode.util';
 import { selectPlannerState } from '../../features/planner/store/planner.selectors';
 
@@ -4251,13 +4254,15 @@ export class ConflictResolutionService {
     }
 
     if (vcComparison === VectorClockComparison.CONCURRENT) {
-      // Preserve commuting intents. Server rejection subsequently reissues a
-      // pending reorder from current state; entity LWW would lose its list write.
+      // Preserve commuting intents. A pending reorder is then reissued from
+      // current state (#10377: also after a competing order or a delete);
+      // entity LWW would lose its list write.
       if (
         ctx.localOpsForEntity.every(
           (localOp, _i, pending) =>
             areCommutingSectionOperations(remoteOp, localOp) ||
-            areCommutingReorderAndContentOperations(remoteOp, localOp, pending),
+            areCommutingReorderAndContentOperations(remoteOp, localOp, pending) ||
+            isReissuedReorderCrossing(remoteOp, localOp),
         )
       ) {
         return { isSupersededOrDuplicate: false, conflict: null };

@@ -1,9 +1,11 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, Injector } from '@angular/core';
 import {
   planRegularOpsAfterFullStateUpload,
   planUploadLastServerSeqUpdate,
 } from '@sp/sync-core';
 import { OperationLogStoreService } from '../persistence/operation-log-store.service';
+import { SupersededOperationResolverService } from './superseded-operation-resolver.service';
+import { isReissuableReorder } from './reorder-conflict.util';
 import { LockService } from './lock.service';
 import {
   Operation,
@@ -72,6 +74,7 @@ export class OperationLogUploadService {
   private encryptionService = inject(OperationEncryptionService);
   private stateSnapshotService = inject(StateSnapshotService);
   private providerManager = inject(SyncProviderManager);
+  private injector = inject(Injector);
 
   async uploadPendingOps(
     syncProvider: OperationSyncCapable,
@@ -160,7 +163,19 @@ export class OperationLogUploadService {
       const { pendingOps, localStateSnapshot } = await this.lockService.request(
         LOCK_NAMES.OPERATION_LOG,
         async () => {
-          const capturedPendingOps = await this.opLogStore.getUnsynced();
+          // #10377: a pending note or habit order that crossed an applied
+          // remote op is reissued first; one whose reissue had to wait never
+          // uploads stale, which a file-based provider would accept.
+          let capturedPendingOps = await this.opLogStore.getUnsynced();
+          if (capturedPendingOps.some(({ op }) => isReissuableReorder(op))) {
+            const { created, deferredOpIds } = await this.injector
+              .get(SupersededOperationResolverService)
+              .reissueCrossedPendingReorders();
+            if (created > 0) capturedPendingOps = await this.opLogStore.getUnsynced();
+            capturedPendingOps = capturedPendingOps.filter(
+              ({ op }) => !deferredOpIds.includes(op.id),
+            );
+          }
           return {
             pendingOps: capturedPendingOps,
             localStateSnapshot:

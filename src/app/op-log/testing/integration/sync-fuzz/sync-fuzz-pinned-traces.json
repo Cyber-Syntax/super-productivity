@@ -1,8 +1,8 @@
 [
   {
     "class": "reorder-wedge",
-    "ref": "#10377",
-    "name": "two concurrent habit reorders stop the second device",
+    "ref": "fixed for #10377 (regression pin)",
+    "name": "two concurrent habit reorders converge",
     "steps": [
       {
         "d": "A",
@@ -13,18 +13,13 @@
         "a": ["reorderHabits", 5, 0]
       }
     ],
-    "primary": "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order",
-    "signatures": [
-      "divergence:.simpleCounter.ids.*",
-      "pending",
-      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order"
-    ],
+    "signatures": [],
     "rejections": []
   },
   {
     "class": "reorder-wedge",
-    "ref": "#10377",
-    "name": "a device stopped by competing habit reorders never uploads a task it adds",
+    "ref": "fixed for #10377 (regression pin)",
+    "name": "a device with a competing habit reorder uploads a task it adds",
     "steps": [
       {
         "d": "A",
@@ -39,22 +34,13 @@
         "a": ["addTask", "t13", "P"]
       }
     ],
-    "primary": "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order",
-    "signatures": [
-      "divergence:.project.entities.*.taskIds.*",
-      "divergence:.simpleCounter.ids.*",
-      "divergence:.task.entities.*",
-      "divergence:.task.ids.*",
-      "lost-entity:task",
-      "pending",
-      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order"
-    ],
+    "signatures": [],
     "rejections": []
   },
   {
     "class": "reorder-wedge",
-    "ref": "#10377",
-    "name": "a project note reorder crossing a delete stops the deleting device",
+    "ref": "fixed for #10377 (regression pin)",
+    "name": "a project note reorder crossing a delete converges",
     "steps": [
       {
         "d": "B",
@@ -65,15 +51,8 @@
         "a": ["reorderNotes", "P", 3, 0]
       }
     ],
-    "primary": "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[Note] Update Note Order",
-    "signatures": [
-      "divergence:.note.entities.*",
-      "divergence:.note.ids.*",
-      "divergence:.project.entities.*.noteIds.*",
-      "pending",
-      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[Note] Update Note Order"
-    ],
-    "rejections": []
+    "signatures": [],
+    "rejections": ["CONFLICT_CONCURRENT [Note] Delete Note"]
   },
   {
     "class": "remote-win-keeps-local-edit",
