@@ -176,6 +176,108 @@ blessed pattern is a `task-shared-meta-reducers/` reducer.
 
 ---
 
+## Conflict resolution — stay on generic paths
+
+Operations are replayed intents, but conflicts are detected and resolved per
+**declared** entity (`getOpEntityIds`). That mismatch fails in two ways:
+
+- **Undeclared writes.** Conflict detection never sees a write the op does not
+  declare (a parent's list, a sibling, another entity type), and entity-level
+  LWW cannot restore it. Each such write that can meet a concurrent edit needs
+  hand-written compensation, or the devices diverge silently.
+- **The fail-closed stop.** An op that declares more than one entity id is a
+  multi-entity op (`isMultiEntityOperation`). When it meets a concurrent edit
+  of a declared entity and no resolution path admits it,
+  `_assertMultiEntityPlansAreSafe` throws `UnsupportedMultiEntityConflictError`.
+  Sync stops until the user picks a side in the whole-dataset "Keep local /
+  Keep remote" dialog.
+
+Multi-entity and intent conflict resolution is the largest root-cause category
+of sync fix code: 51 fixes, ~7.4k net production lines and ~23.9k test lines
+added (measured 2026-09 in
+[the architecture review](../plans/2026-09-26-sync-architecture-review.md)
+§2.2; an upper bound, as the category also caught generic LWW fixes).
+
+1. **Prefer a generic resolution path.** Route a conflict fix through an
+   existing generic mechanism: the disjoint-field merge
+   (`conflict-disjoint-merge.util.ts`), derived membership, or an admission set
+   that `_assertMultiEntityPlansAreSafe` checks, when the action meets the
+   set's documented contract (e.g. `SCOPED_PLAN_MULTI_ACTIONS`). Per-action
+   resolution logic (an `ActionType` branch, predicate or projection written
+   for one action, as in `reorder-conflict.util.ts`) is the last resort. Use
+   it only when no generic path fits, as the smallest safe change, including
+   what released clients do with the ops you emit
+   ([ADR #8](../../ARCHITECTURE-DECISIONS.md#8-additive-data-model-evolution-over-schema-bumps)),
+   and say in the PR why none fits. Whatever the path, prove convergence and
+   content preservation in **both** conflict directions (the change pending
+   locally against the remote edit, and the reverse) with an E2E, and check
+   both timestamp winners. Admitting an action or removing a safety stop
+   without that proof is not a fix (#10264). The `max-lines` cap on
+   `conflict-resolution.service.ts` in `eslint.config.js` only goes down, but
+   its `*.util.ts` helpers are uncapped.
+2. **Don't add denormalized lists or undeclared cross-entity writes.** Store
+   the fact on the child (`task.dueDay`, `task.parentId`, `note.projectId`) and
+   derive the list, as `TODAY_TAG` does
+   ([ADR #2](../../ARCHITECTURE-DECISIONS.md#2-today_tag-virtual-tag-pattern)).
+   A new child field must be [optional](./persisted-model-fields.md). A new
+   list on a parent turns every child edit into a potential multi-entity
+   conflict. Existing lists stay, because released clients read and write
+   them: a child field that shadows one goes stale (review §4.2), and a new
+   action that must update one should reuse the action that already maintains
+   it. True multi-entity transitions that no child fact can express, such as a
+   delete cascade, still follow the atomicity rule above.
+3. **No new crossing may reach the fail-closed stop.** A PR that adds a
+   multi-entity action, or changes what one declares or writes, names the path
+   that resolves its conflicts with concurrent edits of every entity it
+   declares, and covers it with an E2E. If a new action has no such path,
+   change its shape (one declared entity, the fact on the child) instead of
+   compensating for it. Check new edits too: editing a reordered note outside
+   the commuting predicate in `reorder-conflict.util.ts` stops sync against a
+   pending `updateNoteOrder`. Specs that pin today's stops:
+   `src/app/op-log/testing/integration/unsupported-multi-entity-conflict.integration.spec.ts`
+   and, for reorders,
+   `src/app/op-log/testing/integration/reorder-conflict-wedge.integration.spec.ts`.
+   [The remaining-actions audit](../plans/2026-09-26-sync-remaining-conflict-actions-audit.md)
+   inventories the known stops as of 2026-09-26; #10294 and #10295 have since
+   resolved two of the crossings it lists.
+
+---
+
+## Fix intake — evidence before a fix
+
+Most sync fix code has come from our own audits, not from users. Of the 45
+largest sync fixes between the op-log merge (2026-01-11) and 2026-09-26, 27
+(+10.9k production lines) came from audit findings and hardening passes and 11
+(+4.0k) from user reports (measured 2026-09 in
+[the architecture review](../plans/2026-09-26-sync-architecture-review.md)
+§2.2). A fix in this area tends to reveal the next edge case, so fixing
+everything an analysis can find keeps the fix rate high without evidence that
+users are harmed.
+
+A sync fix lands only for one of:
+
+- **A user report** of the problem.
+- **A regression on unreleased master** (`git tag --contains <commit>` prints
+  nothing). Revert the change that introduced it first, unless the revert
+  brings back a bug that a released version has; then fix forward with the
+  narrowest change.
+- **Data loss, a sync stop, or permanent content divergence** on a path that
+  released clients or default settings take, shown by a reproduction: an E2E,
+  or a fuzz seed that fails on every replay. Order-only differences, and
+  disagreement that the next sync repairs, do not qualify.
+
+Everything else found by audits, reviews, fuzzing or reading code becomes an
+issue with the reproduction and the affected path, not a PR. Among fixes that
+qualify, prefer the one that removes a special case or adds the least ongoing
+machinery, and say in the PR which category the fix meets.
+
+**Flow limit.** At most three sync PRs are open at a time. Each one is
+reviewed before merge by a person or a session that did not write it, so
+the next fix is not built on an unchecked one. Further work waits as a draft
+PR or an issue.
+
+---
+
 ## Clearing a field — `undefined` does not survive the wire (#9776)
 
 **Never rely on `changes: { someField: undefined }` reaching another device.**
