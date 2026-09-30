@@ -1143,6 +1143,55 @@ describe('ConflictResolutionService', () => {
         ).toBeTrue();
       });
 
+      // Released receivers (v18.15.0-v19.1.0) replace a habit with a 'replace'
+      // snapshot that cannot carry its `type`; repair then resets it.
+      for (const remoteOpType of [OpType.Update, OpType.Delete]) {
+        it(`sends a local-win habit snapshot as ${remoteOpType === OpType.Update ? 'a patch' : 'a replace recreation'} over a remote ${remoteOpType}`, async () => {
+          const now = Date.now();
+          mockStore.select.and.returnValue(
+            of({
+              id: 'cnt-1',
+              title: 'Local title',
+              isEnabled: true,
+              icon: null,
+              type: 'StopWatch',
+              countOnDay: {},
+              isOn: false,
+            }),
+          );
+          const habitOp = (
+            id: string,
+            clientId: string,
+            at: number,
+            t: OpType,
+          ): Operation => ({
+            ...createOpWithTimestamp(id, clientId, at, t, 'cnt-1'),
+            entityType: 'SIMPLE_COUNTER' as const,
+          });
+
+          await service.autoResolveConflictsLWW([
+            {
+              entityType: 'SIMPLE_COUNTER',
+              entityId: 'cnt-1',
+              localOps: [habitOp('local-upd', 'client-a', now, OpType.Update)],
+              remoteOps: [habitOp('remote-op', 'client-b', now - 1000, remoteOpType)],
+              suggestedResolution: 'manual',
+            },
+          ]);
+
+          const payload = getFirstMixedLocalOp().payload;
+          if (!isLwwUpdatePayload(payload)) throw new Error('expected an LWW payload');
+          expect(payload.actionPayload['type']).toBe('StopWatch');
+          if (remoteOpType === OpType.Update) {
+            expect(payload.lwwUpdateMode).toBe('patch');
+            expect(payload.clearedFields).toContain('streakMinValue');
+          } else {
+            expect(payload.lwwUpdateMode).toBe('replace');
+            expect(payload.recreatesEntityAfterDelete).toBeTrue();
+          }
+        });
+      }
+
       it('should recreate a locally-winning UPDATE over a concurrent remote DELETE on a client-ID tie (#9024)', async () => {
         const now = Date.now();
         mockStore.select.and.returnValue(

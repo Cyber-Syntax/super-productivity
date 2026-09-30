@@ -37,6 +37,7 @@ import {
 import { withLocalOnlySyncSettings } from '../../../features/config/local-only-sync-settings.util';
 import { SyncConfig } from '../../../features/config/global-config.model';
 import { LwwUpdateMode } from '../../../op-log/core/operation.types';
+import { ENVELOPE_SHADOWED_KEYS } from '../../../op-log/core/persistent-action.interface';
 
 /**
  * Updates project.taskIds arrays when a task's project membership changes via LWW Update.
@@ -470,9 +471,6 @@ const filterOrphanedTaskIdsFromEntityData = (
  */
 const ARRAY_RECREATE_UNSAFE_ENTITY_TYPES: ReadonlySet<string> = new Set(['REMINDER']);
 
-/** Action-envelope keys that shadow same-named entity fields (convertOpToAction). */
-const ENVELOPE_SHADOWED_KEYS = ['type', 'meta'] as const;
-
 const applyArrayEntityLwwUpdate = (options: {
   rootState: RootState;
   featureName: string;
@@ -579,8 +577,8 @@ export const lwwUpdateMetaReducer: MetaReducer = (
 
     // Extract entity data from action (exclude 'type' and 'meta').
     // Entity fields named 'type'/'meta' are shadowed by the envelope: adapter
-    // updates keep the existing values (ENVELOPE_SHADOWED_KEYS); a singleton
-    // or recreated entity with such a key would still lose it.
+    // entities restore them from meta.lwwShadowedFields (below), array items
+    // keep theirs by merging, a singleton with such a key would still lose it.
     const actionAny = action as unknown as Record<string, unknown>;
     const actionMeta = actionAny['meta'] as
       | {
@@ -588,6 +586,7 @@ export const lwwUpdateMetaReducer: MetaReducer = (
           isApplyingFromOtherClient?: boolean;
           recreatesEntityAfterDelete?: boolean;
           projectMoveFootprint?: readonly string[];
+          lwwShadowedFields?: Readonly<Record<string, unknown>>;
         }
       | undefined;
     let entityData: Record<string, unknown> = {};
@@ -699,6 +698,15 @@ export const lwwUpdateMetaReducer: MetaReducer = (
     if (Object.prototype.hasOwnProperty.call(Object.prototype, entityId)) {
       OpLog.warn(`lwwUpdateMetaReducer: Unsafe entity id: ${entityId}`);
       return reducer(state, action);
+    }
+
+    // The sender's own `type`/`meta` fields (SimpleCounter.type), which the
+    // action envelope shadows; convertOpToAction carries them in meta.
+    const shadowedFields = actionMeta?.lwwShadowedFields;
+    for (const key of ENVELOPE_SHADOWED_KEYS) {
+      if (shadowedFields && Object.hasOwn(shadowedFields, key)) {
+        entityData[key] = shadowedFields[key];
+      }
     }
 
     // Sanitize date string fields to prevent corrupted data from sync (#6908)
@@ -905,12 +913,14 @@ export const lwwUpdateMetaReducer: MetaReducer = (
         // `modified` is for UI display of "when this client last saw this change"
         modified: Date.now(),
       };
-      // The flat action envelope shadows entity fields named `type`/`meta`, so
-      // a replace snapshot can never carry them. Keep the existing values
-      // rather than drop them (SimpleCounter.type would fail validation and
-      // repair would reset e.g. a Stopwatch habit to ClickCounter).
+      // An op that carried no `type`/`meta` of its own keeps the existing
+      // values: a replace must not drop them (SimpleCounter.type would fail
+      // validation and repair would reset e.g. a Stopwatch habit).
       for (const key of ENVELOPE_SHADOWED_KEYS) {
-        if (Object.prototype.hasOwnProperty.call(existingEntity, key)) {
+        if (
+          !Object.prototype.hasOwnProperty.call(entityData, key) &&
+          Object.prototype.hasOwnProperty.call(existingEntity, key)
+        ) {
           entityWithLocalModified[key] = existingEntity[key];
         }
       }

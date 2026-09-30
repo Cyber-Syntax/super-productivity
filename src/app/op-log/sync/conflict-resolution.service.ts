@@ -118,6 +118,7 @@ import {
 import { RECREATE_FALLBACK } from '../core/recreate-fallback.const';
 import { areCommutingSectionOperations } from './section-conflict-commutativity.util';
 import { areCommutingReorderAndContentOperations } from './reorder-conflict.util';
+import { asPatchSnapshotIfTypeShadowed } from './lww-snapshot-patch-mode.util';
 import { selectPlannerState } from '../../features/planner/store/planner.selectors';
 
 /**
@@ -2805,7 +2806,7 @@ export class ConflictResolutionService {
     // it to win. Using Date.now() would give it an unfair advantage in future conflicts.
     const preservedTimestamp = Math.max(...conflict.localOps.map((op) => op.timestamp));
 
-    let localWinOp = this.createLWWUpdateOp(
+    const localWinOp = this.createLWWUpdateOp(
       conflict.entityType,
       conflict.entityId,
       entityState,
@@ -2815,17 +2816,16 @@ export class ConflictResolutionService {
       'replace',
       latestProjectMoveEntityIds(conflict.entityId, conflict.localOps),
     );
-    if (
+    const isRecreation =
       conflict.remoteOps.some((op) => op.opType === OpType.Delete) ||
       conflict.localOps.some(
         (op) =>
           isLwwUpdatePayload(op.payload) &&
           op.payload.recreatesEntityAfterDelete === true,
-      )
-    ) {
-      localWinOp = markLwwDeleteRecreation(localWinOp);
-    }
-    return localWinOp;
+      );
+    return asPatchSnapshotIfTypeShadowed(
+      isRecreation ? markLwwDeleteRecreation(localWinOp) : localWinOp,
+    );
   }
 
   /**

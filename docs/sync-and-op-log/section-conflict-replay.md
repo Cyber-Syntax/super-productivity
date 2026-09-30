@@ -110,10 +110,10 @@ non-commuting evidence does not admit replay. Recognized content reorders
 `UnsupportedMultiEntityConflictError`: generic entity LWW loses list writes.
 `COUNTER_SET_TODAY` and `COUNTER_SET_FOR_DATE` need no causal proof: each is
 reissued with its original day's current count (a local no-op), because a
-whole-habit LWW snapshot overwrites unrelated fields (released receivers also
-drop the habit's type) and stopping sync would block habit clicks. Other patches
-retain their existing fallback: without proof, a rejected patch becomes a
-whole-entity LWW snapshot (#10338 changes that snapshot for habits).
+whole-habit LWW snapshot overwrites unrelated fields and stopping sync would
+block habit clicks. Other patches retain their existing fallback: without proof,
+a rejected patch becomes a whole-entity LWW snapshot (#10338 changes that
+snapshot for habits).
 
 A pin or unpin without proof keeps that fallback too. Proof can be missing
 after compaction removed the conflict row, and on clock-gap rejections that no

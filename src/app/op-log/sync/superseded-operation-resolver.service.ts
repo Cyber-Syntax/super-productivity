@@ -55,6 +55,7 @@ import {
   touchesCrossEntityTaskFields,
 } from './conflict-disjoint-merge.util';
 import { getPayloadKey } from '../core/entity-registry';
+import { asPatchSnapshotIfTypeShadowed } from './lww-snapshot-patch-mode.util';
 
 type SupersededOperation = {
   opId: string;
@@ -812,6 +813,7 @@ export class SupersededOperationResolverService {
             },
           };
         }
+        newOp = asPatchSnapshotIfTypeShadowed(newOp);
 
         newOpsCreated.push(newOp);
         const followUpOps =

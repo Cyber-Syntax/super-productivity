@@ -203,7 +203,11 @@ Safe patterns, in order of preference:
 On the conflict-resolution side, `createLWWUpdateOp` never lists
 `clearedFields` unless the call site opts in via `listClearedFields` — today
 only the disjoint-merge delta does, re-declaring clears the conflicting ops
-themselves carried. Patch payloads built from **live state** (e.g.
+themselves carried. (`asPatchSnapshotIfTypeShadowed` separately sends a whole
+habit snapshot as a patch, so released receivers keep their **own** `type`
+instead of dropping it; every optional field missing from a full snapshot is a
+real clear, so it lists them. v18.15.0–v18.21.1 ignore `clearedFields`.)
+Partial patch payloads built from **live state** (e.g.
 `taskRelationshipPatch`) materialize accidental `undefined` keys — every root
 task's `parentId` — and must never opt in: listing those would broadcast a
 real clear to receivers (pinned by tests (a0c) in
