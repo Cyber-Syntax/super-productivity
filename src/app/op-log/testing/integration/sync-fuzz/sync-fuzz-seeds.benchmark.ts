@@ -1,6 +1,7 @@
-import { DEFAULT_WEIGHTS, FuzzStep, IntentWeights } from './sync-fuzz-actions';
+import { FuzzStep } from './sync-fuzz-actions';
 import { SyncFuzzHarness } from './sync-fuzz-harness';
 import pinnedTraces from './sync-fuzz-pinned-traces.json';
+import { FUZZ_PROFILES } from './sync-fuzz-profiles';
 import { FuzzFailure, FuzzResult, runFuzz } from './sync-fuzz-runner';
 import { keepKarmaAlive, shrinkTrace } from './sync-fuzz-shrink';
 
@@ -30,24 +31,6 @@ const SHRINK_SLOTS = 12;
 const SHRINK_RUNS = 100;
 /** Set to report every failure signature, pinned or not. */
 const IGNORE_PINNED = false;
-
-/**
- * Intent mixes. `noReorder` leaves out the reorder wedge, a stop that masks
- * every later failure on the stopped device; `tasks` concentrates on task
- * edits crossing tracked time.
- */
-const PROFILES: Record<string, IntentWeights> = {
-  all: DEFAULT_WEIGHTS,
-  noReorder: DEFAULT_WEIGHTS.filter(
-    ([kind]) => kind !== 'reorderNotes' && kind !== 'reorderHabits',
-  ),
-  tasks: [
-    ['renameTask', 3],
-    ['editTaskNotes', 2],
-    ['track', 4],
-    ['doneTask', 1],
-  ],
-};
 
 /** Traces to replay with a full dump, e.g. while triaging a pin. */
 const DEBUG_TRACES: [string, FuzzStep[]][] = [];
@@ -79,7 +62,7 @@ const runSweep = (): Promise<Sweep> =>
   (sweep ??= (async () => {
     const results = new Map<string, FuzzResult>();
     const firstSeen: Sweep['firstSeen'] = [];
-    for (const [profile, weights] of Object.entries(PROFILES)) {
+    for (const [profile, weights] of Object.entries(FUZZ_PROFILES)) {
       for (let seed = FIRST_SEED; seed < FIRST_SEED + SEED_COUNT; seed++) {
         keepKarmaAlive(seed);
         const result = await runFuzz({ seed, stepCount: STEPS, weights });
@@ -108,7 +91,7 @@ const compactDump = (result: FuzzResult): string =>
 describe('sync fuzz random seeds', () => {
   afterEach(() => SyncFuzzHarness.dispose());
 
-  for (const profile of Object.keys(PROFILES)) {
+  for (const profile of Object.keys(FUZZ_PROFILES)) {
     for (let seed = FIRST_SEED; seed < FIRST_SEED + SEED_COUNT; seed++) {
       it(`${profile} seed ${seed} fails only as the pinned traces do`, async () => {
         const result = (await runSweep()).results.get(`${profile} ${seed}`)!;
@@ -133,7 +116,7 @@ describe('sync fuzz random seeds', () => {
       }
       const debug = await runFuzz({ steps: minimal, debug: true });
       fail(
-        `SHRUNK ${signature} seeds=${count}/${SEED_COUNT * Object.keys(PROFILES).length} ` +
+        `SHRUNK ${signature} seeds=${count}/${SEED_COUNT * Object.keys(FUZZ_PROFILES).length} ` +
           `first=${seed} replays=${replays.join(',')} trace=${JSON.stringify(minimal)} ` +
           `failures=${JSON.stringify(debug.failures)} ` +
           `rejections=${JSON.stringify(debug.rejections)} DUMP ${compactDump(debug)}`,
