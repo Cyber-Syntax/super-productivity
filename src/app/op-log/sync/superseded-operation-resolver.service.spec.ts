@@ -358,6 +358,46 @@ describe('SupersededOperationResolverService', () => {
       expect(appendedOp.timestamp).toBe(1000); // Preserved from original
     });
 
+    it('re-uploads only the fields a readable edit wrote, as a patch (#10379)', async () => {
+      const supersededOp = createMockOperation(
+        'op-1',
+        'TASK',
+        'task-1',
+        { clientA: 5 },
+        1000,
+      );
+      supersededOp.actionType = ActionType.TASK_SHARED_UPDATE;
+      supersededOp.payload = {
+        actionPayload: {
+          task: { id: 'task-1', changes: { title: 'Renamed', notes: undefined } },
+          clearedFields: ['notes'],
+        },
+        entityChanges: [],
+      };
+      mockVectorClockService.getCurrentVectorClock.and.resolveTo({ clientA: 3 });
+      // Another device's done toggle is in state; a replace would re-send it.
+      mockConflictResolutionService.getCurrentEntityState.and.resolveTo({
+        id: 'task-1',
+        title: 'Renamed',
+        isDone: true,
+      });
+
+      await service.resolveSupersededLocalOps([{ opId: 'op-1', op: supersededOp }]);
+
+      expect(mockConflictResolutionService.createLWWUpdateOp).toHaveBeenCalledWith(
+        'TASK',
+        'task-1',
+        { title: 'Renamed', notes: undefined },
+        TEST_CLIENT_ID,
+        jasmine.any(Object),
+        1000,
+        'patch',
+        undefined,
+        true,
+      );
+      expectAtomicRejection(['op-1']);
+    });
+
     // Released receivers (v18.15.0-v19.1.0) replace a habit with a 'replace'
     // snapshot that cannot carry its `type`; repair then resets it.
     it('re-uploads a superseded habit snapshot as a patch', async () => {

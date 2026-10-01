@@ -6,6 +6,10 @@
  * KEEPS BOTH by synthesizing a single merged UPDATE whose delta is the union of
  * both sides' changed fields.
  *
+ * Field patches (conflict-field-patch.util.ts) generalize this to fields both
+ * sides wrote; this file keeps the shared field extraction and the disjoint
+ * predicate that the commuting-crossing checks use.
+ *
  * No Angular, no I/O — deterministic, so the merge decision and the synthesized
  * changes delta are unit-testable in isolation. Determinism is the whole point:
  * both clients must arrive at the identical field/value map regardless of
@@ -32,14 +36,6 @@ export const NOISE_FIELDS: ReadonlySet<string> = new Set<string>([
   'lastModified',
   'created',
 ]);
-
-/** Identity of one side of the conflict for the deterministic noise tiebreak. */
-export interface MergeSideMeta {
-  /** Max timestamp across that side's ops. */
-  timestamp: number;
-  /** The client that authored that side. */
-  clientId: string;
-}
 
 /**
  * The changed fields of ONE op, scoped to the entity currently in conflict.
@@ -209,7 +205,7 @@ export const isAdditiveTimeOp = (op: Operation): boolean =>
   op.actionType === ActionType.TASK_REMOVE_TIME_SPENT;
 
 /** The task fields a `syncTimeSpent` delta mutates once applied. */
-const SYNC_TIME_SPENT_FIELDS: readonly string[] = ['timeSpent', 'timeSpentOnDay'];
+export const SYNC_TIME_SPENT_FIELDS: readonly string[] = ['timeSpent', 'timeSpentOnDay'];
 
 /**
  * The non-NOISE fields one side touches, for the disjointness test only, split
@@ -228,7 +224,7 @@ const SYNC_TIME_SPENT_FIELDS: readonly string[] = ['timeSpent', 'timeSpentOnDay'
  * deliberately NOT surfaced through `mergeChangedFields`: the delta's values
  * must never be applied as a field patch.
  */
-const sideNonNoiseKeys = (
+export const sideNonNoiseKeys = (
   ops: Operation[],
   payloadKey: string,
   entityId: string,
@@ -248,26 +244,6 @@ const sideNonNoiseKeys = (
     );
   }
   return { absolute, additive };
-};
-
-/**
- * Deterministic tiebreak for a field both sides changed: the side with the
- * greater `(timestamp, clientId)`. Both clients compute the SAME global winner
- * because the comparison is over the two sides' identities, independent of which
- * side happens to be "local" on a given client.
- */
-export const noiseTiebreakSide = (
-  local: MergeSideMeta,
-  remote: MergeSideMeta,
-): 'local' | 'remote' => {
-  if (local.timestamp !== remote.timestamp) {
-    return local.timestamp > remote.timestamp ? 'local' : 'remote';
-  }
-  if (local.clientId !== remote.clientId) {
-    return local.clientId > remote.clientId ? 'local' : 'remote';
-  }
-  // Same identity on both — value is identical either way; pick 'local'.
-  return 'local';
 };
 
 /**
@@ -384,51 +360,19 @@ export const isCommutingTimeDeltaCrossing = (params: {
  * only the changed fields makes the merged ops identical and leaves every
  * untouched field to its own op/LWW.
  *
- * Convergence: for every non-noise field the value is the same (disjoint sets →
- * each field owned by exactly one side); for every noise field both pick the
- * same global `(timestamp, clientId)` tiebreak winner. Therefore the delta is
- * identical on both clients.
+ * Convergence: a field one side wrote takes that side's value; a field both
+ * sides wrote (real or noise) takes the value of `winner`, the side sync-core's
+ * LWW planner picks (`planLwwConflictResolutions`: max timestamp, then the
+ * clientId of that op). The planner is symmetric, so two clients that resolve
+ * the same two sides from opposite ends name the same global side and build
+ * the identical delta.
  */
 export const synthesizeMergedChanges = (
   localChanges: Record<string, unknown>,
   remoteChanges: Record<string, unknown>,
-  localMeta: MergeSideMeta,
-  remoteMeta: MergeSideMeta,
+  winner: 'local' | 'remote',
 ): Record<string, unknown> => {
-  const changes: Record<string, unknown> = {};
-
-  // Union of both sides' real (non-noise) fields. The two sets are guaranteed
-  // disjoint (isDisjointMergeEligible), so neither overwrites the other.
-  for (const [key, value] of Object.entries(localChanges)) {
-    if (!NOISE_FIELDS.has(key)) {
-      changes[key] = value;
-    }
-  }
-  for (const [key, value] of Object.entries(remoteChanges)) {
-    if (!NOISE_FIELDS.has(key)) {
-      changes[key] = value;
-    }
-  }
-
-  // Resolve every noise field either side changed, deterministically, so both
-  // clients write the identical value (not each their own).
-  const winner = noiseTiebreakSide(localMeta, remoteMeta);
-  const noiseFields = new Set<string>(
-    [...Object.keys(localChanges), ...Object.keys(remoteChanges)].filter((field) =>
-      NOISE_FIELDS.has(field),
-    ),
-  );
-  for (const field of noiseFields) {
-    const localHas = field in localChanges;
-    const remoteHas = field in remoteChanges;
-    if (localHas && remoteHas) {
-      changes[field] = winner === 'local' ? localChanges[field] : remoteChanges[field];
-    } else if (localHas) {
-      changes[field] = localChanges[field];
-    } else {
-      changes[field] = remoteChanges[field];
-    }
-  }
-
-  return changes;
+  const [loserChanges, winnerChanges] =
+    winner === 'local' ? [remoteChanges, localChanges] : [localChanges, remoteChanges];
+  return { ...loserChanges, ...winnerChanges };
 };

@@ -3,8 +3,7 @@ import {
   isAdditiveTimeOp,
   isDisjointMergeEligible,
   mergeChangedFields,
-  MergeSideMeta,
-  noiseTiebreakSide,
+  synthesizeMergedChanges,
   touchesCrossEntityTaskFields,
 } from './conflict-disjoint-merge.util';
 import { ActionType, EntityType, OpType, Operation } from '../core/operation.types';
@@ -419,64 +418,42 @@ describe('conflict-disjoint-merge.util', () => {
     });
   });
 
-  describe('noiseTiebreakSide', () => {
-    it('picks the greater-timestamp side (local newer)', () => {
+  describe('synthesizeMergedChanges', () => {
+    it("keeps each side's own fields and the winner's value of a shared one", () => {
       expect(
-        noiseTiebreakSide(
-          { timestamp: 2000, clientId: 'A' },
-          { timestamp: 1000, clientId: 'Z' },
+        synthesizeMergedChanges(
+          { title: 'L', isDone: true, modified: 1 },
+          { title: 'R', notes: 'n', modified: 2 },
+          'remote',
         ),
-      ).toBe('local');
+      ).toEqual({ title: 'R', isDone: true, notes: 'n', modified: 2 });
+      expect(
+        synthesizeMergedChanges(
+          { title: 'L', isDone: true, modified: 1 },
+          { title: 'R', notes: 'n', modified: 2 },
+          'local',
+        ),
+      ).toEqual({ title: 'L', isDone: true, notes: 'n', modified: 1 });
     });
 
-    it('picks the greater-timestamp side (remote newer)', () => {
-      expect(
-        noiseTiebreakSide(
-          { timestamp: 1000, clientId: 'Z' },
-          { timestamp: 2000, clientId: 'A' },
-        ),
-      ).toBe('remote');
+    it('builds the same delta on both clients when each names the same side', () => {
+      const x = { title: 'X', dueWithTime: undefined };
+      const y = { title: 'Y', notes: 'y' };
+      // Client 1 sees X local / Y remote; client 2 the mirror. The planner is
+      // symmetric, so both name Y.
+      expect(synthesizeMergedChanges(x, y, 'remote')).toEqual(
+        synthesizeMergedChanges(y, x, 'local'),
+      );
     });
 
-    // The equal-timestamp branch: falls back to the greater clientId. This is the
-    // cross-client determinism guarantee — without it two clients could pick
-    // different noise values and diverge.
-    it('breaks an equal-timestamp tie by the greater clientId (local wins)', () => {
-      expect(
-        noiseTiebreakSide(
-          { timestamp: 1000, clientId: 'B' },
-          { timestamp: 1000, clientId: 'A' },
-        ),
-      ).toBe('local');
-    });
-
-    it('breaks an equal-timestamp tie by the greater clientId (remote wins)', () => {
-      expect(
-        noiseTiebreakSide(
-          { timestamp: 1000, clientId: 'A' },
-          { timestamp: 1000, clientId: 'B' },
-        ),
-      ).toBe('remote');
-    });
-
-    it('is fully symmetric on equal timestamps: both clients pick the SAME physical side', () => {
-      // X and Y differ only by clientId. Whichever side X is passed as, the result
-      // must always point at the SAME side (the greater clientId, Y here).
-      const x: MergeSideMeta = { timestamp: 1000, clientId: 'A' };
-      const y: MergeSideMeta = { timestamp: 1000, clientId: 'B' };
-      // Client 1 sees X local / Y remote → picks remote (= Y).
-      expect(noiseTiebreakSide(x, y)).toBe('remote');
-      // Client 2 sees Y local / X remote → picks local (= Y).
-      expect(noiseTiebreakSide(y, x)).toBe('local');
-    });
-
-    it('defaults to local when both identity components are equal', () => {
-      expect(
-        noiseTiebreakSide(
-          { timestamp: 1000, clientId: 'A' },
-          { timestamp: 1000, clientId: 'A' },
-        ),
-      ).toBe('local');
+    it("keeps a clear of the winner's shared field as an undefined key", () => {
+      const merged = synthesizeMergedChanges(
+        { dueWithTime: undefined },
+        { dueWithTime: 5 },
+        'local',
+      );
+      expect('dueWithTime' in merged).toBeTrue();
+      expect(merged['dueWithTime']).toBeUndefined();
     });
   });
 

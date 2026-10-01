@@ -24,14 +24,16 @@ continue to resolve.
 
 ## Disjoint-field auto-merge
 
-When two clients concurrently edit the SAME entity but DIFFERENT (non-noise)
-fields, whole-entity LWW would discard one side's real edit. Instead, both are
-kept by synthesizing a single merged UPDATE op. Eligibility
-(`isDisjointMergeEligible` + the archive-plan guard in
-`conflict-resolution.service.ts`):
+When two clients concurrently edit the SAME entity, whole-entity LWW would
+discard one side's real edits. Instead, both are kept by synthesizing a single
+merged UPDATE op, a field patch: a field both sides wrote takes the LWW
+winner's value (see [lww-field-level-resolution.md](./lww-field-level-resolution.md),
+#10379). Eligibility (`isFieldPatchEligible` in `conflict-field-patch.util.ts`
 
-- neither side has a DELETE op, and the plan is not an archive plan;
-- neither side contains a multi-entity op. Resolution rejects the original ops,
+- the archive-plan guard in `conflict-resolution.service.ts`):
+
+* neither side has a DELETE op, and the plan is not an archive plan;
+* neither side contains a multi-entity op. Resolution rejects the original ops,
   so merging only the conflicted entity would silently drop the bulk op's
   sibling-entity updates. Unsafe partial compensation fails closed before any
   op-log mutation, leaving the local operation pending and surfacing a sync
@@ -50,18 +52,21 @@ kept by synthesizing a single merged UPDATE op. Eligibility
   A sibling missing from current state is not recreated (a later delete owns it).
   Arbitrary bulk actions are not split from `entityChanges`: relationship/list
   mutations may carry atomic invariants that plain payload shape cannot prove;
-- neither side has opaque ops (their changes could not be carried into the
+* neither side has opaque ops (their changes could not be carried into the
   synthesized delta — merging would silently drop them and the two clients
   would synthesize DIFFERENT results);
-- both sides changed at least one real (non-noise) field;
-- the two sides' non-noise changed-field sets are disjoint;
-- the entity has only ONE conflict in this batch. `detectConflicts` emits one
-  conflict per remote op with no per-entity aggregation, so an entity with ≥2
-  concurrent remote ops would synthesize multiple merged ops whose clocks
-  dominate one another — a dominated sibling can be superseded and its field
-  silently dropped. Such entities fall back to whole-entity LWW (honest refusal;
-  per-entity aggregation into one op is a possible future improvement);
-- the entity type has a `RECREATE_FALLBACK` (`TASK` / `PROJECT` / `TAG` /
+* both sides changed at least one real (non-noise) field;
+* time stays out of the patch: a local `syncTimeSpent` delta is kept pending
+  and rebased past the remote side instead; a remote delta, `removeTimeSpent`,
+  or a delta beside an absolute time write refuses the patch;
+* an overlapping patch that would clear a reminder field (`reminderId`,
+  `remindAt`, `dueWithTime`, `deadlineRemindAt`) refuses: v18.15.0–v18.21.x
+  receivers ignore `clearedFields`;
+* all conflicts of one entity in the batch resolve together as ONE patch.
+  `detectConflicts` emits one conflict per remote op, and per-conflict patches
+  would dominate one another, so a superseded sibling would drop its fields
+  (`aggregateEntityConflict`);
+* the entity type has a `RECREATE_FALLBACK` (`TASK` / `PROJECT` / `TAG` /
   `SIMPLE_COUNTER`). The merged op is a partial delta, so if it wins over a
   concurrent DELETE on a client that already applied that delete (a passive
   observer, which does NOT pass through the full-entity reconstruction in
@@ -75,9 +80,9 @@ kept by synthesizing a single merged UPDATE op. Eligibility
 
 **Convergence contract:** both clients must synthesize the byte-identical
 merged **changes delta** regardless of which one performs the merge. The delta
-is the union of both sides' non-noise fields (disjoint, so nothing is clobbered)
-plus the noise fields either side changed, resolved via a deterministic
-`(timestamp, clientId)` tiebreak. Crucially the delta is derived ONLY from the
+is the union of both sides' fields; a field both sides wrote (real or noise)
+takes the value of the side sync-core's LWW planner picks (max timestamp, then
+the clientId of that op), which is symmetric between the two devices. Crucially the delta is derived ONLY from the
 two sides' ops — **not** from either client's current entity snapshot. A
 full-entity snapshot would drag along fields NEITHER side touched; if such an
 untouched field momentarily differs between the two clients (an ordinary
@@ -91,8 +96,10 @@ on top of both sides' history like a normal edit — there is no history rewind.
 `lwwUpdateMetaReducer` applies it via `updateOne` (a shallow merge), so fields
 outside the delta keep their own values on each client. Because the payload is
 flat (not `{ changes }`-shaped), `extractUpdateChanges` yields `{}` for it, so
-a merged op can never itself become disjoint-merge eligible: merges do not
-cascade or re-merge on later syncs.
+a merged op can never itself become patch eligible: merges do not cascade or
+re-merge on later syncs. When a later pending readable edit loses to such a
+row, the local fields that survive it in state are re-emitted
+(`survivingLocalFields`), without reading the row's payload.
 
 ### Composition residual (pre-existing class)
 

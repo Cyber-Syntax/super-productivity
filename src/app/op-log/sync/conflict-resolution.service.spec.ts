@@ -7375,11 +7375,13 @@ describe('ConflictResolutionService', () => {
     it('resolves the mirrored conflicts to the SAME winner on both sides (convergence)', async () => {
       const onA = await detect(opY, [opX]);
       const onB = await detect(opX, [opY]);
+      // Both sides are retained, already-synced rows.
+      mockOpLogStore.getOpById.and.resolveTo({ source: 'local', syncedAt: 1 } as never);
 
       // A: remote (Y, ts 2000) wins → Y is applied via the pipeline, no local-win op.
       mockStore.select.and.returnValue(of({ id: 'task-1', title: 'from A' }));
       const resolutionA = await service.autoResolveConflictsLWW(onA.conflicts);
-      // B: local (Y) wins → ONE dominating LWW op carries B's state everywhere.
+      // B: local (Y) wins → ONE dominating field patch carries both sides' fields.
       mockStore.select.and.returnValue(of({ id: 'task-1', title: 'from B' }));
       const resolutionB = await service.autoResolveConflictsLWW(onB.conflicts);
 
@@ -7807,6 +7809,8 @@ describe('ConflictResolutionService', () => {
 
       const onA = await detect(tieY, [tieX]);
       const onB = await detect(tieX, [tieY]);
+      // Both sides are retained, already-synced rows.
+      mockOpLogStore.getOpById.and.resolveTo({ source: 'local', syncedAt: 1 } as never);
 
       // 'clientB' > 'clientA' → Y wins on BOTH sides: remote-wins on A
       // (no local-win op), local-wins on B (one heal op).

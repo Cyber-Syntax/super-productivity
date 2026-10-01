@@ -59,6 +59,7 @@ import {
 } from './conflict-disjoint-merge.util';
 import { getPayloadKey } from '../core/entity-registry';
 import { asPatchSnapshotIfTypeShadowed } from './lww-snapshot-patch-mode.util';
+import { supersededPatchFields } from './conflict-field-patch.util';
 
 type SupersededOperation = {
   opId: string;
@@ -791,16 +792,28 @@ export class SupersededOperationResolverService {
           ? Array.from(new Set([entityId, ...projectMoveEntityIds]))
           : undefined;
 
-        // Create new UPDATE op with current state and merged clock
+        // Re-emit only the fields the rejected ops wrote, read from current
+        // state, when a patch can carry them all; otherwise the whole entity.
+        const patchFields = supersededPatchFields(
+          entityOps.map(({ op }) => op),
+          entityType,
+          getPayloadKey(entityType) ?? entityType.toLowerCase(),
+          entityId,
+        );
+        const liveEntity = entityState as Record<string, unknown>;
         let newOp = this.conflictResolutionService.createLWWUpdateOp(
           entityType,
           entityId,
-          entityState,
+          patchFields
+            ? Object.fromEntries(patchFields.map((field) => [field, liveEntity[field]]))
+            : entityState,
           clientId,
           mergedClock,
           preservedTimestamp,
-          'replace',
+          patchFields ? 'patch' : 'replace',
           declaredEntityIds,
+          // A written field that is absent now is a clear the ops declared.
+          !!patchFields,
         );
 
         if (

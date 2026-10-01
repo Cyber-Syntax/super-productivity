@@ -184,7 +184,7 @@
   },
   {
     "class": "whole-entity-lww-drops-fields",
-    "ref": "#10379",
+    "ref": "fixed by #10415 (regression pin)",
     "name": "done status is lost when both devices also rename the task",
     "steps": [
       {
@@ -200,13 +200,12 @@
         "a": ["renameTask", "t2", "C28"]
       }
     ],
-    "primary": "field-reverted:task.isDone",
-    "signatures": ["field-reverted:task.isDone"],
-    "rejections": ["CONFLICT_CONCURRENT [TASK] LWW Update"]
+    "signatures": [],
+    "rejections": []
   },
   {
     "class": "whole-entity-lww-drops-fields",
-    "ref": "#10379",
+    "ref": "fixed by #10415 (regression pin)",
     "name": "tracked time is lost to a later concurrent rename",
     "steps": [
       {
@@ -227,8 +226,7 @@
         "a": ["renameTask", "t2", "C29"]
       }
     ],
-    "primary": "time-loss:task",
-    "signatures": ["time-loss:task"],
+    "signatures": [],
     "rejections": []
   },
   {
@@ -1077,6 +1075,126 @@
       "restart-changed:.globalConfig.appFeatures.isScheduleDayPanelEnabled",
       "restart-changed:.globalConfig.appFeatures.isSchedulerEnabled",
       "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "remote-win-keeps-local-edit",
+    "ref": "#10415 residual 1, follow-up #10408 (notes: #10423): a pending delta that loses to a resolution patch row stays on its device",
+    "name": "a tracked delta that loses to a field-patch row stays on its device only",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editTaskNotes", "t1", "A4"]
+      },
+      {
+        "d": "B",
+        "a": ["track", "t1", 2000]
+      },
+      {
+        "d": "A",
+        "s": 1,
+        "r": 1
+      },
+      {
+        "d": "C",
+        "a": ["editTaskNotes", "t1", "C20"],
+        "s": 1
+      }
+    ],
+    "primary": "divergence:.task.entities.*.timeSpent",
+    "signatures": [
+      "divergence:.task.entities.*.notes",
+      "divergence:.task.entities.*.timeSpent",
+      "divergence:.task.entities.*.timeSpentOnDay",
+      "time-loss:task"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "restart-changes-state",
+    "ref": "#10421 (#10415 residual 2): a kept delta reaches the local-win fold, which hoists a done toggle ahead of a stale snapshot",
+    "name": "a done toggle hoisted ahead of a stale local-win snapshot changes on restart",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editTaskNotes", "t1", "A14"]
+      },
+      {
+        "d": "C",
+        "a": ["editTaskNotes", "t1", "C17"]
+      },
+      {
+        "d": "A",
+        "a": ["track", "t1", 2000]
+      },
+      {
+        "d": "C",
+        "a": ["doneTask", "t1", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["track", "t1", 3000]
+      }
+    ],
+    "primary": "restart-changed:.task.entities.*.isDone",
+    "signatures": [
+      "divergence:.task.entities.*.doneOn",
+      "divergence:.task.entities.*.isDone",
+      "divergence:.task.entities.*.notes",
+      "field-reverted:task.isDone",
+      "field-unwritten:task.notes",
+      "restart-changed:.task.entities.*.doneOn",
+      "restart-changed:.task.entities.*.isDone",
+      "restart-changed:.task.entities.*.notes"
+    ],
+    "rejections": []
+  },
+  {
+    "class": "remote-win-keeps-local-edit",
+    "ref": "#10260: a winning side that also tracks time refuses the field patch (#10415 residual; #10408)",
+    "name": "a done toggle that loses a rename crossing to a device that also tracked the task stays on its device only",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["doneTask", "t2", true]
+      },
+      {
+        "d": "A",
+        "a": ["renameTask", "t2", "A1"]
+      },
+      {
+        "d": "B",
+        "a": ["editTaskNotes", "t2", "B2"]
+      },
+      {
+        "d": "B",
+        "a": ["renameTask", "t2", "B3"]
+      },
+      {
+        "d": "C",
+        "a": ["track", "t2", 2000]
+      },
+      {
+        "d": "C",
+        "a": ["renameTask", "t2", "C4"],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "A",
+        "s": 1
+      }
+    ],
+    "primary": "divergence:.task.entities.*.isDone",
+    "signatures": [
+      "divergence:.task.entities.*.doneOn",
+      "divergence:.task.entities.*.isDone",
+      "field-reverted:task.isDone"
     ],
     "rejections": []
   }
