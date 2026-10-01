@@ -94,11 +94,16 @@ import { OperationLogEffects } from '../../../capture/operation-log.effects';
 import { UnsupportedMultiEntityConflictError } from '../../../core/errors/sync-errors';
 import { MAX_LWW_REUPLOAD_RETRIES } from '../../../core/operation-log.const';
 import { PersistentAction } from '../../../core/persistent-action.interface';
-import { DB_VERSION } from '../../../persistence/db-keys.const';
+import {
+  DB_VERSION,
+  SINGLETON_KEY,
+  STORE_NAMES,
+} from '../../../persistence/db-keys.const';
 import { runDbUpgrade } from '../../../persistence/db-upgrade';
 import { IndexedDbOpLogAdapter } from '../../../persistence/indexed-db-op-log-adapter';
 import { OpLogDbAdapter } from '../../../persistence/op-log-db-adapter';
 import { OP_LOG_DB_ADAPTER_FACTORY } from '../../../persistence/op-log-db-adapter.token';
+import { BackupService } from '../../../backup/backup.service';
 import { OperationLogCompactionService } from '../../../persistence/operation-log-compaction.service';
 import { OperationLogHydratorService } from '../../../persistence/operation-log-hydrator.service';
 import { OperationLogStoreService } from '../../../persistence/operation-log-store.service';
@@ -156,10 +161,20 @@ import {
  *   as one session that no sync interrupts. So it never needs
  *   autoAddTodayTagOnTracking, which re-plans a task that a remote change
  *   unplanned mid-session (once per task in a row, by its
- *   distinctUntilChanged memory).
+ *   distinctUntilChanged memory);
+ * - state replacements: the force upload and the backup import run the real
+ *   services, and a step answers the SYNC_IMPORT conflict dialog. Not run:
+ *   the whole-dataset conflict dialog after a stop (DialogSyncConflictComponent,
+ *   recorded as `stop`), cancelling the SYNC_IMPORT dialog as an answer, the
+ *   server-migration confirm (closed unanswered), encryption changes and
+ *   password changes (they need SyncWrapperService, the provider manager and
+ *   deleteAllData), and restoring a SuperSync restore point or a local
+ *   auto-backup.
  */
 
 const FUZZ_SET_STATE = '[SyncFuzz] Set device state';
+/** The real one, captured before any harness spies on it. */
+const getRandomValues = crypto.getRandomValues.bind(crypto);
 interface SetStateAction extends Action {
   state: object;
 }
@@ -290,7 +305,8 @@ const SHARED_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> 
 /** App services whose whole in-memory state devices share on purpose, with the reason. */
 const SHARED_CLASSES: Readonly<Record<string, string>> = {
   SuperSyncStatusService: 'a UI indicator the sync path only writes to',
-  ImexViewService: 'the data-import flag; the fuzz never imports',
+  ImexViewService:
+    'the data-import flag, set only while a backup import runs in one step',
   UserInputWaitStateService: 'set while a dialog waits; recorded dialogs close at once',
   GlobalConfigService: 'derived from the global config, which the fuzz never edits',
   LanguageService: 'the UI language, which the fuzz never changes',
@@ -354,7 +370,13 @@ const fieldsOf = (instance: object): Record<string, unknown> =>
 
 export interface FuzzDevice {
   readonly name: string;
-  readonly clientId: string;
+  /**
+   * `fuzzDev<name>` until a backup import or clean slate rotates it: then
+   * the id OperationLogStoreService.runDestructiveStateReplacement wrote to
+   * the device's database, re-read after the store clears the id cache.
+   */
+  clientId: string;
+  clientIdStale?: boolean;
   readonly client: FakeSuperSyncClient;
   readonly db: IndexedDbOpLogAdapter;
   state: object;
@@ -365,11 +387,12 @@ export type FuzzEventKind =
   | 'stop' // UnsupportedMultiEntityConflictError (SYNC_MULTI_ENTITY_UNSUPPORTED)
   | 'sync-error'
   | 'sync-halted'
-  | 'full-state' // a SYNC_IMPORT / REPAIR / BACKUP_IMPORT reached the transport
+  | 'full-state' // a full-state upload was deferred, or needed an unmodeled transport
   | 'validation'
   | 'permanent-rejection'
   | 'lww-retries-exhausted'
   | 'dialog'
+  | 'import-dialog' // the SYNC_IMPORT conflict dialog, answered by the step (`k`)
   | 'error-snack'
   | 'dev-error';
 
@@ -396,13 +419,17 @@ class FuzzClock {
   }
 }
 
-const recordingDialog = (onOpen: (name: string) => void): Partial<MatDialog> => ({
+/** A dialog stub: records every dialog and closes it with `onOpen`'s answer. */
+const recordingDialog = (onOpen: (name: string) => unknown): Partial<MatDialog> => ({
   open: ((component: { name?: string }) => {
-    onOpen(component?.name ?? 'dialog');
-    return { afterClosed: () => of(undefined), close: () => undefined };
+    const answer = onOpen(component?.name ?? 'dialog');
+    return { afterClosed: () => of(answer), close: () => undefined };
   }) as unknown as MatDialog['open'],
   openDialogs: [],
 });
+
+/** The answers of DialogSyncImportConflictComponent (SyncImportConflictResolution). */
+export type ImportDialogAnswer = 'USE_LOCAL' | 'USE_REMOTE';
 
 export class SyncFuzzHarness {
   /** Bumped by every new harness: an older one must no longer touch TestBed. */
@@ -411,6 +438,19 @@ export class SyncFuzzHarness {
   readonly server: FakeSuperSyncServer;
   readonly devices: FuzzDevice[] = [];
   readonly events: FuzzEvent[] = [];
+  /**
+   * Backup files the user exported (FileImexComponent.downloadBackup), by
+   * label; any device can import one.
+   */
+  readonly backups = new Map<
+    string,
+    Parameters<BackupService['importCompleteBackup']>[0]
+  >();
+  /**
+   * The user's answer to the SYNC_IMPORT conflict dialog while it is set.
+   * Unset, the dialog closes like any other: CANCEL, recorded as `dialog`.
+   */
+  importDialogAnswer?: ImportDialogAnswer;
   step = 0;
   private _current?: FuzzDevice;
   private readonly _clock: FuzzClock;
@@ -429,6 +469,39 @@ export class SyncFuzzHarness {
       : spyOn(Date, 'now')
     ).and.callFake(() => this._clock.now());
     this.server = new FakeSuperSyncServer(() => Date.now());
+    (jasmine.isSpy(crypto.getRandomValues)
+      ? (crypto.getRandomValues as jasmine.Spy)
+      : spyOn(crypto, 'getRandomValues')
+    ).and.callFake((array: Uint8Array) => {
+      const random = this._seededRandom;
+      if (!random || !(array instanceof Uint8Array)) return getRandomValues(array);
+      for (let i = 0; i < array.length; i++) array[i] = Math.floor(random() * 256);
+      return array;
+    });
+  }
+
+  private _seededRandom?: () => number;
+
+  /**
+   * Runs `fn` with crypto.getRandomValues seeded from `seed`. A backup import
+   * mints the device's new client id from it (generateClientId), and conflict
+   * ties compare client ids, so a replayed trace must mint the same one.
+   */
+  async withSeededRandom<T>(seed: string, fn: () => Promise<T>): Promise<T> {
+    let hash = 0;
+    for (const char of seed) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) | 0;
+    let a = hash;
+    this._seededRandom = () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    try {
+      return await fn();
+    } finally {
+      this._seededRandom = undefined;
+    }
   }
 
   /** Restores the global confirm() default of src/test.ts. */
@@ -484,13 +557,31 @@ export class SyncFuzzHarness {
               return target[prop](...args);
             },
     });
-    const clientIds = {
-      loadClientId: async () => this._device().clientId,
-      getOrGenerateClientId: async () => this._device().clientId,
-      clearCache: () => undefined,
+    const clientId = async (): Promise<string> => {
+      const device = this._device();
+      if (device.clientIdStale) {
+        const stored = await device.db.get<string>(STORE_NAMES.CLIENT_ID, SINGLETON_KEY);
+        device.clientId = stored ?? device.clientId;
+        device.clientIdStale = false;
+      }
+      return device.clientId;
     };
-    const onDialog = (name: string): void =>
+    const clientIds = {
+      loadClientId: clientId,
+      getOrGenerateClientId: clientId,
+      clearCache: () => {
+        this._device().clientIdStale = true;
+      },
+    };
+    const onDialog = (name: string): unknown => {
+      const answer = this.importDialogAnswer;
+      if (name === 'DialogSyncImportConflictComponent' && answer) {
+        this.record(this._current, 'import-dialog', answer);
+        return answer;
+      }
       this.record(this._current, 'dialog', `MatDialog.open(${name})`);
+      return undefined;
+    };
     TestBed.configureTestingModule({
       imports: [
         StoreModule.forRoot(undefined, {

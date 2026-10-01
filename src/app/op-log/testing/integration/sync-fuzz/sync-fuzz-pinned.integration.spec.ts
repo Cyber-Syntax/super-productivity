@@ -1,7 +1,7 @@
 import { FuzzStep } from './sync-fuzz-actions';
 import { SyncFuzzHarness } from './sync-fuzz-harness';
 import pinnedTraces from './sync-fuzz-pinned-traces.json';
-import { runFuzz } from './sync-fuzz-runner';
+import { IS_REPAIR_SIGNATURE, runFuzz } from './sync-fuzz-runner';
 
 /**
  * Pinned sync fuzz traces: minimized three-device traces. Each pin asserts
@@ -67,6 +67,12 @@ describe('sync fuzz pinned traces (known current behavior)', () => {
           signatures: pin.signatures,
           rejections: pin.rejections,
         });
+      // A REPAIR or failed validation carries the run's dump for triage.
+      for (const failure of failures) {
+        if (IS_REPAIR_SIGNATURE.test(failure.signature)) {
+          expect(failure.detail).withContext(failure.signature).toContain(' DUMP ');
+        }
+      }
     }, 60_000);
   }
 });

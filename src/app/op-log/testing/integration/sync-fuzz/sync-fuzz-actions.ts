@@ -31,6 +31,8 @@ import {
 import { TimeTrackingState } from '../../../../features/time-tracking/time-tracking.model';
 import { WorkContextType } from '../../../../features/work-context/work-context.model';
 import { TaskSharedActions } from '../../../../root-store/meta/task-shared.actions';
+import { BackupService } from '../../../backup/backup.service';
+import { OperationLogSyncService } from '../../../sync/operation-log-sync.service';
 import { getDbDateStr } from '../../../../util/get-db-date-str';
 import { moveItemInArray } from '../../../../util/move-item-in-array';
 import { SyncFuzzHarness } from './sync-fuzz-harness';
@@ -58,12 +60,18 @@ export type Intent =
   | ['addHabit', string]
   | ['editHabit', string, 'title' | 'isEnabled', string | boolean]
   | ['countHabit', string]
-  | ['reorderHabits', number, number];
+  | ['reorderHabits', number, number]
+  // State replacements (REPLACEMENT_WEIGHTS only):
+  | ['forceUpload']
+  | ['exportBackup', string]
+  | ['importBackup', string];
 
 /**
  * One step: a device, an optional action, then optional events in this
  * order: sync (`s`), op-log compaction (`c`), restart from the device's
- * database (`r`).
+ * database (`r`). `k` answers the SYNC_IMPORT conflict dialog if the step's
+ * sync opens it: keep local data (`L`, USE_LOCAL) or use the remote data
+ * (`R`, USE_REMOTE). Without `k` the dialog is cancelled and fails the run.
  */
 export interface FuzzStep {
   d: string;
@@ -71,7 +79,15 @@ export interface FuzzStep {
   s?: 1;
   c?: 1;
   r?: 1;
+  k?: 'L' | 'R';
 }
+
+/** The intents that replace the whole dataset (full-state ops). */
+export const REPLACEMENT_INTENTS: ReadonlySet<Intent[0]> = new Set([
+  'forceUpload',
+  'exportBackup',
+  'importBackup',
+]);
 
 /** A value the step wrote, for the preservation oracles. */
 export interface FuzzWrite {
@@ -132,10 +148,14 @@ const enabledHabitIds = (view: DeviceView): string[] =>
 /**
  * Whether the UI offers the intent in this device state:
  * - note.component.html shows the pin toggle for project notes only;
- * - only enabled habits show a counter button.
+ * - only enabled habits show a counter button;
+ * - the sync settings offer "Force overwrite" (forceUpload) and the
+ *   import/export page offers backup export and import in every state; an
+ *   import needs the exported file, which executeIntent checks.
  * Other intents are always offered while their target exists.
  */
 export const isUiPossible = (intent: Intent, view: DeviceView): boolean => {
+  if (REPLACEMENT_INTENTS.has(intent[0])) return true;
   if (intent[0] === 'editNote' && intent[2] === 'isPinnedToToday') {
     return !!view.notes.find((n) => n.id === intent[1])?.projectId;
   }
@@ -378,6 +398,49 @@ export const executeIntent = async (
       );
       return [];
     }
+    case 'forceUpload': {
+      // SyncWrapperService.forceUpload, once its confirm() is accepted: a
+      // clean-slate SYNC_IMPORT (FORCE_UPLOAD) of this device's state. Its
+      // runWithSyncBlocked and sync-cycle guard are left out: the harness
+      // never runs two syncs at once.
+      const device = harness.current!;
+      try {
+        await TestBed.inject(OperationLogSyncService).forceUploadLocalState(
+          device.client,
+        );
+      } catch (e) {
+        harness.record(device, 'sync-error', `forceUpload ${(e as Error)?.name}`);
+      }
+      return [];
+    }
+    case 'exportBackup': {
+      // FileImexComponent.downloadBackup: the complete backup, as a file.
+      const [, label] = intent;
+      const data = await TestBed.inject(BackupService).loadCompleteBackup(true);
+      harness.backups.set(label, JSON.parse(JSON.stringify(data)) as typeof data);
+      return [];
+    }
+    case 'importBackup': {
+      // FileImexComponent's import: BackupService.importCompleteBackup, a
+      // BACKUP_IMPORT with a new client id, uploaded as a clean slate at the
+      // next sync. The import clears the SuperSync cursors in localStorage
+      // (_resetAllLastServerSeqs); the fake client keeps its cursor in memory.
+      // Its encryption check has nothing to do: the fuzz never encrypts.
+      const [, label] = intent;
+      const backup = harness.backups.get(label);
+      const device = harness.current!;
+      if (!backup) return undefined;
+      await harness.withSeededRandom(`${device.name}:${label}:${harness.step}`, () =>
+        TestBed.inject(BackupService).importCompleteBackup(
+          structuredClone(backup),
+          false,
+          true,
+          true,
+        ),
+      );
+      await device.client.setLastServerSeq(0);
+      return [];
+    }
   }
 };
 
@@ -404,6 +467,17 @@ export const DEFAULT_WEIGHTS: IntentWeights = [
   ['addHabit', 0.5],
 ];
 
+/**
+ * DEFAULT_WEIGHTS plus the state replacements the UI offers. A separate mix,
+ * so seeds of the default mix keep their traces (#10382's numbers).
+ */
+export const REPLACEMENT_WEIGHTS: IntentWeights = [
+  ...DEFAULT_WEIGHTS,
+  ['forceUpload', 0.5],
+  ['exportBackup', 0.5],
+  ['importBackup', 0.5],
+];
+
 /** Picks an intent that applies to this device's state (up to a few tries). */
 export const generateIntent = (
   random: Random,
@@ -412,6 +486,7 @@ export const generateIntent = (
   label: string,
   nextId: (prefix: string) => string,
   weights: IntentWeights = DEFAULT_WEIGHTS,
+  backupLabels: readonly string[] = [],
 ): Intent | undefined => {
   const pick = <T>(items: readonly T[]): T | undefined =>
     items.length ? items[Math.floor(random() * items.length)] : undefined;
@@ -484,6 +559,15 @@ export const generateIntent = (
       }
       case 'reorderHabits':
         return ['reorderHabits', index(), index()];
+      case 'forceUpload':
+        return ['forceUpload'];
+      case 'exportBackup':
+        return ['exportBackup', nextId('b')];
+      case 'importBackup': {
+        const backup = pick(backupLabels);
+        if (backup) return ['importBackup', backup];
+        break;
+      }
     }
   }
   return undefined;

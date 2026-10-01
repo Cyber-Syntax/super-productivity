@@ -881,5 +881,144 @@
     ],
     "signatures": [],
     "rejections": []
+  },
+  {
+    "class": "replacement",
+    "ref": "coverage trace: the dropped edit is by design (AGENTS.md sync rule 7)",
+    "name": "a force upload while another device has an unsynced edit: that device uses the remote data and drops its edit",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["renameTask", "t1", "B1"]
+      },
+      {
+        "d": "C",
+        "a": ["track", "t2", 2000],
+        "s": 1
+      },
+      {
+        "d": "A",
+        "a": ["forceUpload"]
+      },
+      {
+        "d": "B",
+        "s": 1,
+        "k": "R"
+      },
+      {
+        "d": "C",
+        "a": ["renameTask", "t2", "C2"],
+        "s": 1,
+        "r": 1,
+        "k": "R"
+      }
+    ],
+    "signatures": [],
+    "rejections": []
+  },
+  {
+    "class": "replacement",
+    "ref": "coverage trace: the replaced state is by design (AGENTS.md sync rule 7)",
+    "name": "a force upload while another device has an unsynced edit: that device keeps its data and replaces the state again",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["renameTask", "t1", "B1"]
+      },
+      {
+        "d": "A",
+        "a": ["forceUpload"]
+      },
+      {
+        "d": "B",
+        "s": 1,
+        "k": "L"
+      },
+      {
+        "d": "A",
+        "a": ["track", "t1", 3000],
+        "s": 1,
+        "c": 1,
+        "r": 1,
+        "k": "R"
+      }
+    ],
+    "signatures": [],
+    "rejections": []
+  },
+  {
+    "class": "replacement",
+    "ref": "coverage trace: the replaced state is by design (AGENTS.md sync rule 7)",
+    "name": "a backup exported on one device and imported on another replaces the state, across compaction and restart",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["track", "t1", 3000],
+        "s": 1
+      },
+      {
+        "d": "A",
+        "a": ["exportBackup", "b1"]
+      },
+      {
+        "d": "C",
+        "a": ["addNote", "n11", "P"],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["importBackup", "b1"],
+        "s": 1,
+        "k": "L"
+      },
+      {
+        "d": "C",
+        "a": ["track", "t1", 2000],
+        "s": 1,
+        "k": "R"
+      },
+      {
+        "d": "B",
+        "a": ["renameTask", "t1", "B1"],
+        "s": 1,
+        "c": 1,
+        "r": 1
+      }
+    ],
+    "signatures": [],
+    "rejections": []
+  },
+  {
+    "class": "use-remote-app-features",
+    "ref": "#10399",
+    "name": "a restored backup discarded with use-remote data turns every app feature on at the next restart",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["exportBackup", "b1"]
+      },
+      {
+        "d": "A",
+        "a": ["renameTask", "t1", "A1"],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["importBackup", "b1"],
+        "s": 1,
+        "k": "R"
+      }
+    ],
+    "primary": "restart-changed:.globalConfig.appFeatures.isBoardsEnabled",
+    "signatures": [
+      "restart-changed:.globalConfig.appFeatures.isBoardsEnabled",
+      "restart-changed:.globalConfig.appFeatures.isFinishDayEnabled",
+      "restart-changed:.globalConfig.appFeatures.isFocusModeEnabled",
+      "restart-changed:.globalConfig.appFeatures.isHabitsEnabled",
+      "restart-changed:.globalConfig.appFeatures.isIssuesPanelEnabled",
+      "restart-changed:.globalConfig.appFeatures.isScheduleDayPanelEnabled",
+      "restart-changed:.globalConfig.appFeatures.isSchedulerEnabled"
+    ],
+    "rejections": []
   }
 ]

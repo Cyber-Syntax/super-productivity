@@ -32,10 +32,11 @@ import * as port from '../../../src/app/op-log/testing/integration/sync-fuzz/fak
  * - OperationUploadService.processOperation on PGlite against the port's
  *   uploadOps, per op: accepted or not, error code, existingClock, serverSeq
  *   and the stored row.
- * The piggyback, and the download's client exclusion, `hasMore` probe and gap
- * cases, are asserted on the port alone: the route handler and the download
- * service read through the global Prisma client. The port header lists what
- * is not checked. A server change to the rules compared with the real code
+ * The piggyback and the download's `hasMore` probe are asserted on the port
+ * alone: the route handlers read through the global Prisma client.
+ * sync-fuzz-server-full-state-parity.pglite.spec.ts mocks that client onto
+ * PGlite to check SyncService.uploadOps (full-state ops) and the download
+ * service. The port header lists what is not checked. A server change to the rules compared with the real code
  * fails here until the port follows; a change to the port-only rules does not.
  */
 

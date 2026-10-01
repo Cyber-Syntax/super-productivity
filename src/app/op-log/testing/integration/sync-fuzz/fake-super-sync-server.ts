@@ -4,6 +4,7 @@ import {
   // durable client clock.
   // eslint-disable-next-line no-restricted-imports
   limitVectorClockSize,
+  MAX_VECTOR_CLOCK_SIZE,
   VectorClock,
 } from '@sp/sync-core';
 import type {
@@ -24,8 +25,10 @@ import type {
  * logger. This file must stay free of Angular imports so the server's vitest
  * can load it.
  *
- * Checked against the real server code by
- * packages/super-sync-server/tests/sync-fuzz-server-parity.pglite.spec.ts:
+ * Checked against the real server code by the parity specs in
+ * packages/super-sync-server/tests/: sync-fuzz-server-parity.pglite.spec.ts
+ * for the first three, sync-fuzz-server-full-state-parity.pglite.spec.ts for
+ * the last two:
  * - conflict.ts: detectConflict (the production SQL, on PGlite) and the pure
  *   entity-id, duplicate and in-request retry helpers;
  * - validation.service.ts: ValidationService.validateOp against
@@ -33,24 +36,31 @@ import type {
  * - operation-upload.service.ts: OperationUploadService.processOperation (on
  *   PGlite) against uploadOps, per op: accepted or not, error code,
  *   existingClock and serverSeq, including in-request retries, stored
- *   duplicates and the clock-drift clamp.
+ *   duplicates and the clock-drift clamp;
+ * - sync.service.ts: SyncService.uploadOps (on PGlite, the Prisma client
+ *   mocked onto it) against uploadBatch, with full-state ops: the
+ *   state-replacement fence, the REPAIR base check, the clean-slate wipe and
+ *   its rollback, the latest-full-state marker, and clock pruning that keeps
+ *   the latest full-state author;
+ * - operation-download.service.ts: getOpsSinceWithSeq (same mock) against the
+ *   port's: the snapshot skip, the snapshot vector clock, client exclusion
+ *   and the gap cases.
  *
  * Asserted on this port only, NOT checked against the real code:
- * - the upload route's piggyback (sync.routes.ops-handler.ts): the ops since
- *   `lastKnownServerSeq`, without the uploader's own;
- * - the download (sync.routes.ts, operation-download.service.ts): without the
- *   requesting client's ops, the `limit + 1` probe for `hasMore`, and the gap
- *   cases (a cursor ahead of the server, a hole in the returned ops, a cursor
- *   behind the oldest kept op). The fuzz reaches no gap: its cursors come
- *   from the server, and the port never prunes.
+ * - the upload route (sync.routes.ops-handler.ts): the piggyback of the ops
+ *   since `lastKnownServerSeq` without the uploader's own, except after a
+ *   fence rejection;
+ * - the snapshot route (sync.routes.snapshot-handler.ts, uploadSnapshot): the
+ *   409 for a second `initial` import and the durable op-id check;
+ * - the download route (sync.routes.ts): the `limit + 1` probe for `hasMore`.
  *
- * Not modeled, because the fuzz never reaches it: full-state ops and snapshot
- * uploads (both throw FuzzUnsupportedTransportError), the state-replacement
- * fence, the download's snapshot skip and snapshot vector clock, clock pruning
- * that protects a full-state author, quotas, rate limits, the request dedup
- * cache, WebSocket notifications, and the validation rules outside the subset
- * (op id, op type and entity type checks, clock sanitizing, payload size and
- * depth, BATCH payloads).
+ * Not modeled: quotas, rate limits, the request dedup caches (a retry is
+ * re-processed; for the single-threaded fuzz that answers as the cache would,
+ * except a REPAIR_STALE or INVALID_OP_ID retried within 5 minutes),
+ * WebSocket notifications, pruning and cleanup jobs (so no download gap),
+ * DELETE /api/sync/data (deleteAllData throws FuzzUnsupportedTransportError),
+ * and the validation rules outside the subset (op id, op type and entity
+ * type checks, clock sanitizing, payload size and depth, BATCH payloads).
  *
  * E2EE: the real server accepts only end-to-end encrypted uploads
  * (violatesE2eeGate in sync.routes.payload.ts): every payload is a ciphertext
@@ -68,6 +78,40 @@ const MAX_CLOCK_DRIFT_MS = 60 * 1000; // DEFAULT_SYNC_CONFIG.maxClockDriftMs
 const MISC_TASKS_SPLIT_SCHEMA_VERSION = 2;
 const PIGGYBACK_LIMIT = 500;
 const FULL_STATE_OP_TYPES = new Set(['SYNC_IMPORT', 'BACKUP_IMPORT', 'REPAIR']);
+/** The action type the snapshot route stores on a full-state op. */
+export const FULL_STATE_ACTION_TYPE = '[SP_ALL] Load(import) all data';
+/** sync.types.ts STATE_REPLACEMENT_REQUIRED_ERROR: the fence's rejection text. */
+export const STATE_REPLACEMENT_REQUIRED_ERROR =
+  'Download the latest full-state replacement before retrying';
+
+/** sync.types.ts isCausalFullStateOperation (and latestCausalFullStateSql). */
+export const isCausalFullState = (
+  op: Pick<SyncOperation, 'opType' | 'repairBaseServerSeq'>,
+): boolean =>
+  op.opType === 'SYNC_IMPORT' ||
+  op.opType === 'BACKUP_IMPORT' ||
+  (op.opType === 'REPAIR' && op.repairBaseServerSeq != null);
+
+/** The body of POST /api/sync/snapshot (UploadSnapshotRequest), as the fuzz sends it. */
+export interface FakeSnapshotRequest {
+  state: unknown;
+  clientId: string;
+  reason: 'initial' | 'recovery' | 'migration';
+  vectorClock: VectorClock;
+  schemaVersion?: number;
+  isPayloadEncrypted?: boolean;
+  opId: string;
+  isCleanSlate?: boolean;
+  snapshotOpType?: 'SYNC_IMPORT' | 'BACKUP_IMPORT' | 'REPAIR';
+  syncImportReason?: string;
+  repairBaseServerSeq?: number;
+}
+
+/** user_sync_state's latest-full-state marker: its seq and unpruned merged clock. */
+export interface FullStateMarker {
+  seq: number;
+  clock: VectorClock;
+}
 
 export type ConflictType =
   | 'concurrent'
@@ -373,11 +417,28 @@ export class FakeSuperSyncServer {
   /** Every rejection, for oracles and failure reports. */
   readonly rejections: FakeServerRejection[] = [];
   private _lastSeq = 0;
+  /** user_sync_state.latest_state_replacement_seq: null until resolved. */
+  private _latestStateReplacementSeq: number | null = null;
+  /** user_sync_state.latest_full_state_seq / _vector_clock (unpruned). */
+  private _latestFullState: FullStateMarker | null = null;
 
   constructor(private readonly _now: () => number = () => Date.now()) {}
 
   get latestSeq(): number {
     return this.rows.length ? this._lastSeq : 0;
+  }
+
+  /** For the parity spec: the fence and the full-state marker. */
+  get syncState(): {
+    lastSeq: number;
+    latestStateReplacementSeq: number | null;
+    latestFullState: FullStateMarker | null;
+  } {
+    return clone({
+      lastSeq: this._lastSeq,
+      latestStateReplacementSeq: this._latestStateReplacementSeq,
+      latestFullState: this._latestFullState,
+    });
   }
 
   /** The latest op touching `entityType:entityId` via entity_id or entity_ids. */
@@ -439,36 +500,34 @@ export class FakeSuperSyncServer {
   }
 
   /**
-   * POST /api/sync/ops: the per-op loop of sync.service.ts uploadOps, then the
-   * route's piggyback (sync.routes.ops-handler.ts) of other clients' ops.
+   * POST /api/sync/ops (sync.routes.ops-handler.ts): sync.service.ts
+   * uploadOps, then the piggyback of other clients' ops. A fence rejection
+   * piggybacks the uploader's own ops too, so it receives a replacement it
+   * authored itself.
    */
   uploadOps(
     rawOps: SyncOperation[],
     clientId: string,
     lastKnownServerSeq?: number,
   ): OpUploadResponse {
-    const fullState = rawOps.find((op) => FULL_STATE_OP_TYPES.has(op.opType));
-    if (fullState) {
-      throw new FuzzUnsupportedTransportError(
-        `full-state op upload (${fullState.opType}) from ${clientId}`,
+    const results = this.uploadBatch(rawOps, clientId, { lastKnownServerSeq });
+    const isFenceRejection =
+      results.length > 0 &&
+      results.every(
+        (r) =>
+          !r.accepted &&
+          r.errorCode === 'INTERNAL_ERROR' &&
+          r.error === STATE_REPLACEMENT_REQUIRED_ERROR,
       );
-    }
-    const ops = clone(rawOps);
-    const now = this._now();
-    const firstById = new Map<string, { op: SyncOperation; ts: number }>();
-    const results = ops.map((op) => {
-      const first = firstById.get(op.id);
-      if (!first) firstById.set(op.id, { op: { ...op }, ts: op.timestamp });
-      return this._processOperation(clientId, op, now, first);
-    });
     let newOps: ServerSyncOperation[] | undefined;
     let latestSeq = this.latestSeq;
     let hasMorePiggyback = false;
     if (lastKnownServerSeq !== undefined) {
       const piggyback = this.getOpsSinceWithSeq(
         lastKnownServerSeq,
-        clientId,
+        isFenceRejection ? undefined : clientId,
         PIGGYBACK_LIMIT,
+        false,
       );
       newOps = piggyback.ops;
       latestSeq = piggyback.latestSeq;
@@ -482,6 +541,219 @@ export class FakeSuperSyncServer {
       latestSeq,
       ...(hasMorePiggyback ? { hasMorePiggyback: true } : {}),
     });
+  }
+
+  /**
+   * sync.service.ts SyncService.uploadOps: the state-replacement fence, the
+   * REPAIR base check and the clean-slate wipe (all or nothing), then the
+   * per-op loop; accepted imports move the fence.
+   */
+  uploadBatch(
+    rawOps: SyncOperation[],
+    clientId: string,
+    options: {
+      isCleanSlate?: boolean;
+      repairBaseServerSeq?: number;
+      allowLegacyRepairWithoutBase?: boolean;
+      lastKnownServerSeq?: number;
+    } = {},
+  ): OpUploadResult[] {
+    const { isCleanSlate, repairBaseServerSeq, lastKnownServerSeq } = options;
+    if (isCleanSlate && rawOps.length === 0) return [];
+    const ops = clone(rawOps);
+    const now = this._now();
+    const containsRepair = ops.some((op) => op.opType === 'REPAIR');
+    const isLegacyRepairUpload =
+      containsRepair &&
+      repairBaseServerSeq === undefined &&
+      !!options.allowLegacyRepairWithoutBase;
+    const shouldCleanSlate = !!isCleanSlate && !containsRepair;
+    if (isCleanSlate) {
+      const invalid = ops.map((op) => validateOpSubset(asOpaque(op), clientId));
+      if (invalid.some((v) => v)) {
+        return ops.map((op, i) => ({
+          opId: op.id,
+          accepted: false,
+          error: invalid[i]?.error ?? 'Clean-slate batch contains an invalid operation',
+          errorCode: invalid[i]?.errorCode ?? 'INTERNAL_ERROR',
+        }));
+      }
+    }
+    // The transaction: a clean slate that any op rejects rolls back, the
+    // fence's lazy resolution included.
+    const saved = this._saveTransactionState();
+    const needsSyncStateLock =
+      shouldCleanSlate ||
+      lastKnownServerSeq !== undefined ||
+      (containsRepair && !isLegacyRepairUpload);
+    if (needsSyncStateLock) {
+      // The real server resolves an unset fence from the retained import
+      // rows (resolveRetainedReplacementSeq). Every import this port keeps
+      // was accepted after the fence was last reset, so that is always none
+      // here: 0, the resolved "no retained replacement". Porting pruning or
+      // DELETE /api/sync/data breaks that: restore the lazy lookup then.
+      this._latestStateReplacementSeq ??= 0;
+      if (
+        lastKnownServerSeq !== undefined &&
+        lastKnownServerSeq < this._latestStateReplacementSeq
+      ) {
+        return ops.map((op) => ({
+          opId: op.id,
+          accepted: false,
+          error: STATE_REPLACEMENT_REQUIRED_ERROR,
+          errorCode: 'INTERNAL_ERROR',
+        }));
+      }
+    }
+    if (containsRepair && !isLegacyRepairUpload) {
+      // The raw allocator (last_seq), not getLatestSeq.
+      if (repairBaseServerSeq === undefined || repairBaseServerSeq !== this._lastSeq) {
+        return ops.map((op) =>
+          op.opType === 'REPAIR'
+            ? {
+                opId: op.id,
+                accepted: false,
+                error: 'REPAIR snapshot does not include current server state',
+                errorCode: 'REPAIR_STALE',
+              }
+            : {
+                opId: op.id,
+                accepted: false,
+                error: 'Batch deferred because its REPAIR snapshot is stale',
+                errorCode: 'INTERNAL_ERROR',
+              },
+        );
+      }
+    }
+    if (shouldCleanSlate) {
+      // The allocator (_lastSeq) survives, so sequence numbers continue.
+      this.rows.length = 0;
+      this._latestFullState = null;
+      this._latestStateReplacementSeq = null;
+    }
+    const firstById = new Map<string, { op: SyncOperation; ts: number }>();
+    const results = ops.map((op) => {
+      const first = firstById.get(op.id);
+      if (!first) firstById.set(op.id, { op: { ...op }, ts: op.timestamp });
+      return this._processOperation(clientId, op, now, first);
+    });
+    let latestAcceptedReplacementSeq: number | undefined;
+    ops.forEach((op, i) => {
+      const { accepted, serverSeq } = results[i];
+      if (
+        accepted &&
+        serverSeq !== undefined &&
+        (op.opType === 'SYNC_IMPORT' || op.opType === 'BACKUP_IMPORT')
+      ) {
+        latestAcceptedReplacementSeq = Math.max(
+          latestAcceptedReplacementSeq ?? 0,
+          serverSeq,
+        );
+      }
+    });
+    if (latestAcceptedReplacementSeq !== undefined) {
+      this._latestStateReplacementSeq = latestAcceptedReplacementSeq;
+    }
+    if (isCleanSlate && results.some((r) => !r.accepted)) {
+      this._restoreTransactionState(saved);
+      return results.map((r) =>
+        r.accepted
+          ? {
+              opId: r.opId,
+              accepted: false,
+              error: 'Clean-slate replacement was rolled back',
+              errorCode: 'INTERNAL_ERROR',
+            }
+          : r,
+      );
+    }
+    return results;
+  }
+
+  /**
+   * POST /api/sync/snapshot (sync.routes.snapshot-handler.ts), after the E2EE
+   * gate, the request dedup cache and the quota checks. A 409 is thrown as
+   * the SuperSync provider throws it; every other outcome is the response.
+   */
+  uploadSnapshot(request: FakeSnapshotRequest): SnapshotUploadResponse {
+    const {
+      state,
+      clientId,
+      reason,
+      vectorClock,
+      schemaVersion,
+      isPayloadEncrypted,
+      opId,
+      isCleanSlate,
+      snapshotOpType,
+      syncImportReason,
+      repairBaseServerSeq,
+    } = request;
+    const shouldCleanSlate = snapshotOpType === 'REPAIR' ? false : isCleanSlate;
+    const isLegacyRepairUpload =
+      snapshotOpType === 'REPAIR' &&
+      repairBaseServerSeq === undefined &&
+      isCleanSlate === true;
+    if (reason === 'initial' && !shouldCleanSlate) {
+      const existing = this._findExistingSyncImport(opId);
+      if (existing) {
+        if (opId && existing.op.id === opId) {
+          return { accepted: true, serverSeq: existing.serverSeq };
+        }
+        throw new FakeSyncImportExistsError();
+      }
+    }
+    const op: SyncOperation = {
+      id: opId,
+      clientId,
+      actionType: FULL_STATE_ACTION_TYPE,
+      opType: snapshotOpType ?? 'SYNC_IMPORT',
+      entityType: 'ALL',
+      payload: state,
+      vectorClock,
+      timestamp: this._now(),
+      schemaVersion: schemaVersion ?? 1,
+      isPayloadEncrypted: isPayloadEncrypted ?? false,
+      ...(syncImportReason ? { syncImportReason } : {}),
+      ...(repairBaseServerSeq !== undefined ? { repairBaseServerSeq } : {}),
+    } as SyncOperation;
+    // Inside the per-user storage lock:
+    if (shouldCleanSlate || snapshotOpType === 'REPAIR') {
+      const existing = this.rows.find((row) => row.op.id === opId);
+      if (existing) {
+        const isExactRetry =
+          FULL_STATE_OP_TYPES.has(existing.op.opType) &&
+          isSameIncomingOperation(
+            asOpaque({ ...existing.op, timestamp: op.timestamp }),
+            asOpaque(op),
+            0,
+            0,
+          );
+        return isExactRetry
+          ? { accepted: true, serverSeq: existing.serverSeq }
+          : {
+              accepted: false,
+              error: 'Operation ID already belongs to a different operation',
+              errorCode: 'INVALID_OP_ID',
+            };
+      }
+    }
+    // Left out, as they answer like the checks above and in uploadBatch here:
+    // the route's own REPAIR base check (against getLatestSeq, which only
+    // differs from the allocator while no row exists), and turning a
+    // DUPLICATE_OPERATION into success (every retry the fuzz can send hits
+    // the `initial` or the op-id check first).
+    const [result] = this.uploadBatch([op], clientId, {
+      isCleanSlate: shouldCleanSlate,
+      repairBaseServerSeq,
+      allowLegacyRepairWithoutBase: isLegacyRepairUpload,
+    });
+    return {
+      accepted: result.accepted,
+      serverSeq: result.serverSeq,
+      error: result.error,
+      errorCode: result.errorCode,
+    };
   }
 
   /**
@@ -525,6 +797,8 @@ export class FakeSuperSyncServer {
     }
     const invalid = validateOpSubset(asOpaque(op), clientId);
     if (invalid) return reject(invalid.errorCode, invalid.error);
+    // The unpruned clock, for the full-state marker.
+    const fullStateClock = isCausalFullState(op) ? { ...op.vectorClock } : undefined;
     const existing = this.rows.find((row) => row.op.id === op.id);
     if (existing) {
       return isSameDuplicateOperation(
@@ -549,13 +823,31 @@ export class FakeSuperSyncServer {
       return reject(code, conflict.reason ?? code, conflict.existingClock);
     }
     const serverSeq = ++this._lastSeq;
-    // Pruning runs AFTER comparison, BEFORE storage.
+    // Pruning runs AFTER comparison, BEFORE storage. An oversized clock keeps
+    // the latest causal full-state author (this op, if it is one).
+    const author = fullStateClock
+      ? op.clientId
+      : Object.keys(op.vectorClock).length > MAX_VECTOR_CLOCK_SIZE
+        ? this._latestCausalFullState()?.op.clientId
+        : undefined;
+    const protectedIds =
+      Object.keys(op.vectorClock).length > MAX_VECTOR_CLOCK_SIZE && author
+        ? [author]
+        : [];
     const stored: SyncOperation = {
       ...op,
-      vectorClock: limitVectorClockSize(op.vectorClock, [op.clientId]),
+      vectorClock: limitVectorClockSize(op.vectorClock, [op.clientId, ...protectedIds]),
       entityIds: getStoredEntityIds(op),
       isPayloadEncrypted: op.isPayloadEncrypted ?? false,
     };
+    if (fullStateClock) {
+      // The marker: every earlier stored clock merged with this op's own.
+      const merged = this._aggregateClock((row) => row.serverSeq < serverSeq);
+      for (const [id, counter] of Object.entries(fullStateClock)) {
+        merged[id] = Math.max(merged[id] ?? 0, counter);
+      }
+      this._latestFullState = { seq: serverSeq, clock: merged };
+    }
     this.rows.push({
       serverSeq,
       receivedAt: now,
@@ -565,18 +857,44 @@ export class FakeSuperSyncServer {
     return { opId: op.id, accepted: true, serverSeq };
   }
 
-  /** services/operation-download.service.ts getOpsSinceWithSeq, without full-state ops. */
+  /**
+   * services/operation-download.service.ts getOpsSinceWithSeq: a cursor before
+   * the latest causal full-state op starts at that op (the snapshot skip).
+   */
   getOpsSinceWithSeq(
     sinceSeq: number,
     excludeClient: string | undefined,
     limit: number,
-  ): { ops: ServerSyncOperation[]; latestSeq: number; gapDetected: boolean } {
+    includeSnapshotMetadata: boolean = true,
+  ): {
+    ops: ServerSyncOperation[];
+    latestSeq: number;
+    gapDetected: boolean;
+    snapshotVectorClock?: VectorClock;
+  } {
     const latestSeq = this._lastSeq;
     if (latestSeq === 0) return { ops: [], latestSeq, gapDetected: sinceSeq > 0 };
+    const snapshotRow = this._latestCausalFullState(latestSeq);
+    let effectiveSinceSeq = sinceSeq;
+    let snapshotVectorClock: VectorClock | undefined;
+    if (snapshotRow && sinceSeq < snapshotRow.serverSeq) {
+      effectiveSinceSeq = snapshotRow.serverSeq - 1;
+      if (includeSnapshotMetadata) {
+        const preserve = [
+          ...(excludeClient ? [excludeClient] : []),
+          snapshotRow.op.clientId,
+        ];
+        const clock =
+          this._latestFullState?.seq === snapshotRow.serverSeq
+            ? this._latestFullState.clock
+            : this._aggregateClock((row) => row.serverSeq <= snapshotRow.serverSeq);
+        snapshotVectorClock = limitVectorClockSize(clock, preserve);
+      }
+    }
     const ops = this.rows
       .filter(
         (row) =>
-          row.serverSeq > sinceSeq &&
+          row.serverSeq > effectiveSinceSeq &&
           row.serverSeq <= latestSeq &&
           (!excludeClient || row.op.clientId !== excludeClient),
       )
@@ -588,12 +906,17 @@ export class FakeSuperSyncServer {
     }
     let gapDetected = sinceSeq > latestSeq && latestSeq > 0;
     if (sinceSeq > 0 && latestSeq > 0) {
-      if (minSeq !== null && sinceSeq < minSeq - 1) gapDetected = true;
-      if (!excludeClient && ops.length > 0 && ops[0].serverSeq > sinceSeq + 1) {
+      if (minSeq !== null && effectiveSinceSeq < minSeq - 1) gapDetected = true;
+      if (!excludeClient && ops.length > 0 && ops[0].serverSeq > effectiveSinceSeq + 1) {
         gapDetected = true;
       }
     }
-    return { ops, latestSeq, gapDetected };
+    return {
+      ops,
+      latestSeq,
+      gapDetected,
+      ...(snapshotVectorClock ? { snapshotVectorClock } : {}),
+    };
   }
 
   /** GET /api/sync/ops (sync.routes.ts): limit+1 probe for `hasMore`. */
@@ -611,9 +934,64 @@ export class FakeSuperSyncServer {
       hasMore,
       latestSeq: result.latestSeq,
       gapDetected: result.gapDetected || undefined,
+      snapshotVectorClock: result.snapshotVectorClock,
       serverTime: this._now(),
       capabilities: { causalRepairSnapshots: true },
     });
+  }
+
+  /** latestCausalFullStateSql: the newest causal full-state row, up to `maxSeq`. */
+  private _latestCausalFullState(maxSeq?: number): StoredOperation | undefined {
+    for (let i = this.rows.length - 1; i >= 0; i--) {
+      const row = this.rows[i];
+      if (
+        (maxSeq === undefined || row.serverSeq <= maxSeq) &&
+        isCausalFullState(row.op)
+      ) {
+        return row;
+      }
+    }
+    return undefined;
+  }
+
+  /** sync.routes.quota.ts findExistingSyncImport: this op id, else the newest full-state op. */
+  private _findExistingSyncImport(opId: string): StoredOperation | undefined {
+    const exact = this.rows.find((row) => row.op.id === opId);
+    if (exact && FULL_STATE_OP_TYPES.has(exact.op.opType)) return exact;
+    return [...this.rows].reverse().find((row) => FULL_STATE_OP_TYPES.has(row.op.opType));
+  }
+
+  /** The per-client max of the stored (pruned) clocks of the matching rows. */
+  private _aggregateClock(match: (row: StoredOperation) => boolean): VectorClock {
+    const clock: VectorClock = {};
+    for (const row of this.rows.filter(match)) {
+      for (const [id, counter] of Object.entries(row.op.vectorClock)) {
+        clock[id] = Math.max(clock[id] ?? 0, counter);
+      }
+    }
+    return clock;
+  }
+
+  private _saveTransactionState(): object {
+    return {
+      rows: [...this.rows],
+      lastSeq: this._lastSeq,
+      latestFullState: this._latestFullState,
+      latestStateReplacementSeq: this._latestStateReplacementSeq,
+    };
+  }
+
+  private _restoreTransactionState(saved: object): void {
+    const s = saved as {
+      rows: StoredOperation[];
+      lastSeq: number;
+      latestFullState: FullStateMarker | null;
+      latestStateReplacementSeq: number | null;
+    };
+    this.rows.splice(0, this.rows.length, ...s.rows);
+    this._lastSeq = s.lastSeq;
+    this._latestFullState = s.latestFullState;
+    this._latestStateReplacementSeq = s.latestStateReplacementSeq;
   }
 
   private _toServerOp(row: StoredOperation): ServerSyncOperation {
@@ -626,8 +1004,20 @@ export class FakeSuperSyncServer {
   }
 }
 
-/** Thrown for the transports the fuzz does not model (full-state replacement). */
+/** Thrown for the transports the fuzz does not model. */
 export class FuzzUnsupportedTransportError extends Error {}
+
+/**
+ * The 409 SYNC_IMPORT_EXISTS reply, as the SuperSync provider throws it
+ * (SuperSyncHttpStatusError: the status line, then the server's reason).
+ */
+export class FakeSyncImportExistsError extends Error {
+  readonly status = 409;
+  readonly code = 'SYNC_IMPORT_EXISTS';
+  constructor() {
+    super('HTTP 409 Conflict — SYNC_IMPORT_EXISTS');
+  }
+}
 
 /** One device's SuperSync client: own cursor, shared server, JSON on the wire. */
 export class FakeSuperSyncClient implements OperationSyncCapable<'superSyncOps'> {
@@ -661,24 +1051,43 @@ export class FakeSuperSyncClient implements OperationSyncCapable<'superSyncOps'>
     this._lastServerSeq = seq;
   }
 
+  /**
+   * The real provider says true only after a download response advertised
+   * the capability; every response of this server does, and every sync
+   * downloads before it uploads.
+   */
   supportsCausalRepairSnapshots(): boolean {
     return true;
   }
 
   async uploadSnapshot(
-    _state: unknown,
+    state: unknown,
     clientId: string,
-    reason: string,
-    _vectorClock: VectorClock,
-    _schemaVersion: number,
-    _isPayloadEncrypted: boolean | undefined,
-    _opId: string,
-    _isCleanSlate?: boolean,
+    reason: 'initial' | 'recovery' | 'migration',
+    vectorClock: VectorClock,
+    schemaVersion: number,
+    isPayloadEncrypted: boolean | undefined,
+    opId: string,
+    isCleanSlate?: boolean,
     snapshotOpType?: string,
+    syncImportReason?: string,
+    repairBaseServerSeq?: number,
   ): Promise<SnapshotUploadResponse> {
-    throw new FuzzUnsupportedTransportError(
-      `full-state upload (${snapshotOpType ?? 'SYNC_IMPORT'}, ${reason}) from ${clientId}`,
-    );
+    // JSON on the wire, as the provider sends it.
+    const request = clone({
+      state,
+      clientId,
+      reason,
+      vectorClock,
+      schemaVersion,
+      isPayloadEncrypted,
+      opId,
+      isCleanSlate,
+      snapshotOpType,
+      ...(syncImportReason ? { syncImportReason } : {}),
+      ...(repairBaseServerSeq !== undefined ? { repairBaseServerSeq } : {}),
+    }) as FakeSnapshotRequest;
+    return clone(this._server.uploadSnapshot(request));
   }
 
   async deleteAllData(): Promise<{ success: boolean }> {
