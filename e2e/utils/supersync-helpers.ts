@@ -376,6 +376,12 @@ export const createSimulatedClient = async (
   testPrefix: string,
   options: {
     allowExampleTasks?: boolean;
+    /**
+     * Start with the calm new-install app features (`NEW_INSTALL_APP_FEATURES`)
+     * instead of the all-features-on set the E2E suite otherwise uses. The tour
+     * stays hidden: the app never shows it to a Playwright user agent.
+     */
+    isNewInstallAppFeatures?: boolean;
     /** Released bundles register service workers; block them when switching builds. */
     serviceWorkers?: 'allow' | 'block';
     /**
@@ -385,7 +391,11 @@ export const createSimulatedClient = async (
     seedBeforeBoot?: (page: Page) => Promise<void>;
   } = {},
 ): Promise<SimulatedE2EClient> => {
-  const { allowExampleTasks = false, seedBeforeBoot } = options;
+  const {
+    allowExampleTasks = false,
+    isNewInstallAppFeatures = false,
+    seedBeforeBoot,
+  } = options;
   // Use provided baseURL or fall back to localhost:4242 (Playwright fixture may be undefined)
   const effectiveBaseURL = baseURL || 'http://localhost:4242';
 
@@ -415,14 +425,21 @@ export const createSimulatedClient = async (
   // This runs before any page JavaScript, so Angular sees the flags immediately.
   // Tests of the example-task sync gate opt back in via { allowExampleTasks: true }
   // so first-run onboarding tasks are actually created.
-  await page.addInitScript((allowExamples) => {
-    localStorage.setItem('SUP_ONBOARDING_PRESET_DONE', 'true');
-    localStorage.setItem('SUP_ONBOARDING_HINTS_DONE', 'true');
-    localStorage.setItem('SUP_IS_SHOW_TOUR', 'true');
-    if (!allowExamples) {
-      localStorage.setItem('SUP_EXAMPLE_TASKS_CREATED', 'true');
-    }
-  }, allowExampleTasks);
+  await page.addInitScript(
+    ({ allowExamples, isNewInstall }) => {
+      localStorage.setItem('SUP_ONBOARDING_PRESET_DONE', 'true');
+      localStorage.setItem('SUP_ONBOARDING_HINTS_DONE', 'true');
+      // getInitialAppFeatures() starts E2E clients with every feature on only
+      // while this flag is set.
+      if (!isNewInstall) {
+        localStorage.setItem('SUP_IS_SHOW_TOUR', 'true');
+      }
+      if (!allowExamples) {
+        localStorage.setItem('SUP_EXAMPLE_TASKS_CREATED', 'true');
+      }
+    },
+    { allowExamples: allowExampleTasks, isNewInstall: isNewInstallAppFeatures },
+  );
 
   page.on('console', (msg) => {
     if (msg.type() === 'error') {

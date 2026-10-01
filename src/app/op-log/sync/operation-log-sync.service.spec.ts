@@ -62,7 +62,12 @@ import { T } from '../../t.const';
 import { INBOX_PROJECT } from '../../features/project/project.const';
 import { TODAY_TAG, SYSTEM_TAG_IDS } from '../../features/tag/tag.const';
 import { OperationSyncCapable } from '../sync-providers/provider.interface';
-import { selectSyncConfig } from '../../features/config/store/global-config.reducer';
+import {
+  CONFIG_FEATURE_NAME,
+  selectSyncConfig,
+} from '../../features/config/store/global-config.reducer';
+import { GlobalConfigState } from '../../features/config/global-config.model';
+import { loadAllData } from '../../root-store/meta/load-all-data.action';
 
 // Mirrors StateSnapshotService's DEFAULT_ARCHIVE (what getStateSnapshot() reports).
 const EMPTY_ARCHIVE = {
@@ -5155,6 +5160,45 @@ describe('OperationLogSyncService', () => {
           isManualSyncOnly: true,
         }),
       );
+    });
+
+    it("persists the device's own appFeatures in a rebuild baseline without a snapshot (#10399)", async () => {
+      const mockStore = TestBed.inject(MockStore);
+      const liveAppFeatures = {
+        ...DEFAULT_GLOBAL_CONFIG.appFeatures,
+        isBoardsEnabled: false,
+        isHabitsEnabled: false,
+      };
+      // State, not overrideSelector: an override sticks to the shared memoized
+      // selector and leaks into later specs that derive from it.
+      mockStore.setState({
+        [CONFIG_FEATURE_NAME]: { ...DEFAULT_GLOBAL_CONFIG, appFeatures: liveAppFeatures },
+      });
+      const dispatchSpy = spyOn(mockStore, 'dispatch').and.callThrough();
+      downloadServiceSpy.downloadRemoteOps.and.resolveTo({
+        newOps: [makeRemoteOp()],
+        needsFullStateUpload: false,
+        success: true,
+        providerMode: 'superSyncOps',
+        failedFileCount: 0,
+        latestServerSeq: 1,
+      });
+      const mockProvider = {
+        supportsOperationSync: true,
+        setLastServerSeq: jasmine.createSpy('setLastServerSeq').and.resolveTo(),
+      } as unknown as OperationSyncCapable;
+
+      await service.forceDownloadRemoteState(mockProvider);
+
+      const baselineState = opLogStoreSpy.runRemoteStateReplacement.calls.mostRecent()
+        .args[0].baselineState as { globalConfig: GlobalConfigState };
+      expect(baselineState.globalConfig.appFeatures).toEqual(liveAppFeatures);
+      // The live reset keeps the device's config, so both sides agree.
+      const reset = dispatchSpy.calls
+        .allArgs()
+        .map(([action]) => action as unknown as ReturnType<typeof loadAllData>)
+        .find((action) => action.type === loadAllData.type)!;
+      expect(reset.appDataComplete.globalConfig).toBeUndefined();
     });
 
     it('should capture a safety backup after download but before replacement (#8107)', async () => {

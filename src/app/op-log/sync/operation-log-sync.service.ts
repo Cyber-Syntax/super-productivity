@@ -75,13 +75,16 @@ import { Operation, OperationLogEntry } from '../core/operation.types';
 import { ValidateStateService } from '../validation/validate-state.service';
 import { extractEntityKeysFromState } from '../persistence/extract-entity-keys';
 import { firstValueFrom } from 'rxjs';
-import { selectSyncConfig } from '../../features/config/store/global-config.reducer';
+import {
+  selectAppFeaturesConfig,
+  selectSyncConfig,
+} from '../../features/config/store/global-config.reducer';
+import { buildRemoteRebuildBaselineState } from './remote-rebuild-baseline.util';
 import {
   applyLocalOnlySyncSettingsToAppData,
   LocalOnlySyncSettings,
   stripLocalOnlySyncSettingsFromAppData,
 } from '../../features/config/local-only-sync-settings.util';
-import { DEFAULT_GLOBAL_CONFIG } from '../../features/config/default-global-config.const';
 import { OperationApplierService } from '../apply/operation-applier.service';
 import { processDeferredActions } from './process-deferred-actions-flush.util';
 import { HydrationStateService } from '../apply/hydration-state.service';
@@ -1917,30 +1920,10 @@ export class OperationLogSyncService {
     }
     const defaultData = getDefaultMainModelData();
     const baselineSource = snapshotState ?? defaultData;
-    const baselineGlobalConfig =
-      baselineSource['globalConfig'] && typeof baselineSource['globalConfig'] === 'object'
-        ? (baselineSource['globalConfig'] as Record<string, unknown>)
-        : {};
-    const baselineSyncConfig =
-      baselineGlobalConfig['sync'] && typeof baselineGlobalConfig['sync'] === 'object'
-        ? (baselineGlobalConfig['sync'] as Record<string, unknown>)
-        : {};
-    // getDefaultMainModelData intentionally excludes globalConfig. Add a
-    // default config shell before applying the canonical device-local fields
-    // so an interrupted rebuild can hydrate enough configuration to sync again.
-    const baselineState = applyLocalOnlySyncSettingsToAppData(
-      {
-        ...baselineSource,
-        globalConfig: {
-          ...DEFAULT_GLOBAL_CONFIG,
-          ...baselineGlobalConfig,
-          sync: {
-            ...DEFAULT_GLOBAL_CONFIG.sync,
-            ...baselineSyncConfig,
-          },
-        },
-      },
+    const baselineState = buildRemoteRebuildBaselineState(
+      baselineSource,
       localOnlySyncSettings,
+      await firstValueFrom(this.store.select(selectAppFeaturesConfig)),
     );
     const archiveYoung =
       (snapshotState?.[
@@ -2025,7 +2008,9 @@ export class OperationLogSyncService {
             vectorClock: rebuiltClock,
             schemaVersion: CURRENT_SCHEMA_VERSION,
             snapshotEntityKeys: extractEntityKeysFromState(
-              baselineState as Parameters<typeof extractEntityKeysFromState>[0],
+              baselineState as unknown as Parameters<
+                typeof extractEntityKeysFromState
+              >[0],
             ),
             archiveYoung,
             archiveOld,

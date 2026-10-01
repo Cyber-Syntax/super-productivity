@@ -982,8 +982,8 @@
   },
   {
     "class": "use-remote-app-features",
-    "ref": "#10399",
-    "name": "a restored backup discarded with use-remote data turns every app feature on at the next restart",
+    "ref": "#10412",
+    "name": "a restored backup discarded with use-remote data keeps the new-install app features through the next restart",
     "steps": [
       {
         "d": "B",
@@ -1001,16 +1001,7 @@
         "k": "R"
       }
     ],
-    "primary": "restart-changed:.globalConfig.appFeatures.isBoardsEnabled",
-    "signatures": [
-      "restart-changed:.globalConfig.appFeatures.isBoardsEnabled",
-      "restart-changed:.globalConfig.appFeatures.isFinishDayEnabled",
-      "restart-changed:.globalConfig.appFeatures.isFocusModeEnabled",
-      "restart-changed:.globalConfig.appFeatures.isHabitsEnabled",
-      "restart-changed:.globalConfig.appFeatures.isIssuesPanelEnabled",
-      "restart-changed:.globalConfig.appFeatures.isScheduleDayPanelEnabled",
-      "restart-changed:.globalConfig.appFeatures.isSchedulerEnabled"
-    ],
+    "signatures": [],
     "rejections": []
   }
 ]
