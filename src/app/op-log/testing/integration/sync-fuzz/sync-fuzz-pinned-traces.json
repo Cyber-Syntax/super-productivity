@@ -517,7 +517,7 @@
   {
     "class": "restart-changes-state",
     "ref": "#10381",
-    "name": "after a delete, a recreate and concurrent renames, a restart changes the time and title",
+    "name": "after a delete, a recreate and concurrent renames, a restart moves the task in Today; title and time stay",
     "steps": [
       {
         "d": "A",
@@ -549,19 +549,11 @@
         "s": 1
       }
     ],
-    "primary": "restart-changed:.task.entities.*.title",
+    "primary": "restart-changed:.tag.entities.*.taskIds.*",
     "signatures": [
-      "divergence:.project.entities.*.taskIds.*",
       "divergence:.tag.entities.*.taskIds.*",
-      "divergence:.task.entities.*.timeSpent",
-      "divergence:.task.entities.*.timeSpentOnDay",
-      "divergence:.task.entities.*.title",
       "divergence:.task.ids.*",
-      "restart-changed:.project.entities.*.taskIds.*",
       "restart-changed:.tag.entities.*.taskIds.*",
-      "restart-changed:.task.entities.*.timeSpent",
-      "restart-changed:.task.entities.*.timeSpentOnDay",
-      "restart-changed:.task.entities.*.title",
       "restart-changed:.task.ids.*"
     ],
     "rejections": ["CONFLICT_CONCURRENT [TASK] LWW Update"]
