@@ -614,6 +614,45 @@
     "rejections": []
   },
   {
+    "class": "reorder-kept-stop",
+    "ref": "coverage trace: the stop is kept by design (#10364 admission matrix); the replaced state is by design (AGENTS.md sync rule 7)",
+    "name": "the unpinning device keeps its data in the dialog after the stop and replaces the state",
+    "steps": [
+      {
+        "d": "A",
+        "a": ["editNote", "n1", "isPinnedToToday", true],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "s": 1
+      },
+      {
+        "d": "C",
+        "a": ["editNote", "n1", "isPinnedToToday", false]
+      },
+      {
+        "d": "B",
+        "a": ["reorderNotes", "T", 0, 1],
+        "s": 1
+      },
+      {
+        "d": "C",
+        "s": 1,
+        "k": "L"
+      }
+    ],
+    "primary": "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[Note] Update Note Order",
+    "signatures": [
+      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[Note] Update Note Order"
+    ],
+    "rejections": []
+  },
+  {
     "class": "reorder-crossing",
     "ref": "fixed by #10364 (regression pin)",
     "name": "a project note reorder crossing a pin converges",
@@ -1002,6 +1041,43 @@
       }
     ],
     "signatures": [],
+    "rejections": []
+  },
+  {
+    "class": "use-remote-app-features",
+    "ref": "#10399",
+    "name": "habit orders over different sets stop a device that then uses the remote data in the dialog, and a restart turns every app feature on",
+    "steps": [
+      {
+        "d": "B",
+        "a": ["addHabit", "h11"]
+      },
+      {
+        "d": "A",
+        "a": ["reorderHabits", 7, 0],
+        "s": 1
+      },
+      {
+        "d": "B",
+        "a": ["reorderHabits", 3, 5]
+      },
+      {
+        "d": "B",
+        "s": 1,
+        "k": "R"
+      }
+    ],
+    "primary": "restart-changed:.globalConfig.appFeatures.isBoardsEnabled",
+    "signatures": [
+      "restart-changed:.globalConfig.appFeatures.isBoardsEnabled",
+      "restart-changed:.globalConfig.appFeatures.isFinishDayEnabled",
+      "restart-changed:.globalConfig.appFeatures.isFocusModeEnabled",
+      "restart-changed:.globalConfig.appFeatures.isHabitsEnabled",
+      "restart-changed:.globalConfig.appFeatures.isIssuesPanelEnabled",
+      "restart-changed:.globalConfig.appFeatures.isScheduleDayPanelEnabled",
+      "restart-changed:.globalConfig.appFeatures.isSchedulerEnabled",
+      "stop:SYNC_MULTI_ENTITY_UNSUPPORTED side=remote actionType=[SimpleCounter] Update SimpleCounter Order"
+    ],
     "rejections": []
   }
 ]

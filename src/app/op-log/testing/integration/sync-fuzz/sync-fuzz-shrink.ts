@@ -51,12 +51,13 @@ export const shrinkTrace = async (
 
   // Then try each step without its action or one of its events.
   for (let i = 0; i < current.length && runs < maxRuns; i++) {
-    const { d, a, s, c, r } = current[i];
+    const { d, a, s, c, r, k } = current[i];
+    // A dialog answer (`k`) applies only to the step's sync, so it goes with it.
     const variants: [unknown, FuzzStep][] = [
-      [a, { d, s, c, r }],
+      [a, { d, s, c, r, k }],
       [s, { d, a, c, r }],
-      [c, { d, a, s, r }],
-      [r, { d, a, s, c }],
+      [c, { d, a, s, r, k }],
+      [r, { d, a, s, c, k }],
     ];
     for (const [dropped, simpler] of variants) {
       const { a: action, s: sync, c: compact, r: restart } = simpler;

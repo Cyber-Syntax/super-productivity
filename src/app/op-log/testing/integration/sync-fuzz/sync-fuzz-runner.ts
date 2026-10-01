@@ -61,7 +61,8 @@ export interface FuzzOptions {
   /**
    * Intent mix for generated traces (default DEFAULT_WEIGHTS). A mix with a
    * state replacement also answers the SYNC_IMPORT conflict dialog on every
-   * step (`k`).
+   * step (`k`). Every mix answers the whole-dataset dialog after a stop; see
+   * runFuzz's `modelsStopDialog`.
    */
   weights?: IntentWeights;
   debug?: boolean;
@@ -72,8 +73,13 @@ const SYNC_PROBABILITY = 0.35;
 const COMPACT_PROBABILITY = 0.1;
 const RESTART_PROBABILITY = 0.1;
 const SETTLE_ROUNDS = 6;
-/** How often a generated step keeps local data in the SYNC_IMPORT conflict dialog. */
+/** How often a generated step keeps local data in a dialog (`k`). */
 const USE_LOCAL_PROBABILITY = 0.3;
+/**
+ * Seeds the `k` stream of mixes without a replacement intent: drawing `k`
+ * from the main stream would change every trace of those mixes, stop or not.
+ */
+const DIALOG_STREAM_SALT = 0x5f0d1a10;
 /**
  * Full-state ops that only a user's replacement intent creates: the force
  * upload (also the dialog's USE_LOCAL) and the backup import.
@@ -112,7 +118,9 @@ interface LedgerEntry {
   device: string;
   clientId: string;
   clock: VectorClock;
-  /** Its device answered USE_REMOTE before the server accepted it. */
+  /** The device's own counter before the intent: its ops are above it. */
+  counterBefore: number;
+  /** One of its ops was still unsynced when its device answered USE_REMOTE. */
   discarded?: boolean;
 }
 
@@ -307,42 +315,82 @@ export const runFuzz = async (options: FuzzOptions): Promise<FuzzResult> => {
     }
   };
   const entries: LedgerEntry[] = [];
-  const note = async (intent: Intent, writes: FuzzWrite[]): Promise<void> => {
+  const ownClock = async (): Promise<VectorClock> =>
+    (await TestBed.inject(OperationLogStoreService).getVectorClock()) ?? {};
+  /** Runs the intent on the current device and records it in the ledger. */
+  const executeAndNote = async (intent: Intent): Promise<FuzzWrite[] | undefined> => {
+    const before = await ownClock();
+    const writes = await executeIntent(harness, intent);
+    if (!writes) return undefined;
     const device = harness.current!;
-    const clock = (await TestBed.inject(OperationLogStoreService).getVectorClock()) ?? {};
     entries.push({
       intent,
       writes,
       device: device.name,
       clientId: device.clientId,
-      clock,
+      clock: await ownClock(),
+      counterBefore: before[device.clientId] ?? 0,
     });
+    return writes;
   };
+  /** Per device, the ledger length at its last USE_REMOTE rebuild. */
+  const rebuiltAt = new Map<string, number>();
   /**
-   * Syncs `device`, answering the SYNC_IMPORT conflict dialog with `answer`.
-   * USE_REMOTE rebuilds the device from the server's history, discarding its
-   * changes the server never accepted, as the dialog says: the ledger
-   * excuses those intents.
+   * Whether a stop has been answered with USE_LOCAL: its force upload is a
+   * user's replacement, so from then on the SYNC_IMPORT dialog it opens on
+   * the other devices is answered too, in every mix.
    */
-  const sync = async (device: FuzzDevice, answer?: ImportDialogAnswer): Promise<void> => {
+  let hasUserReplacement = false;
+  /**
+   * Syncs `device`, answering the SYNC_IMPORT conflict dialog with
+   * `importAnswer` and the whole-dataset dialog after a stop with
+   * `stopAnswer`. USE_REMOTE rebuilds the device from the server's history,
+   * discarding its unsynced changes, as both dialogs say: the ledger excuses
+   * those intents. USE_LOCAL after a stop force-uploads
+   * the device's state, a replacement like the force upload intent's: the
+   * oracles excuse what it drops through `lastReplacement`.
+   */
+  const sync = async (
+    device: FuzzDevice,
+    importAnswer?: ImportDialogAnswer,
+    stopAnswer?: ImportDialogAnswer,
+  ): Promise<void> => {
     const before = harness.events.length;
-    harness.importDialogAnswer = answer;
+    harness.importDialogAnswer = importAnswer;
+    harness.stopDialogAnswer = stopAnswer;
     await harness.sync(device);
     harness.importDialogAnswer = undefined;
-    const usedRemote = harness.events
+    harness.stopDialogAnswer = undefined;
+    const answeredLocal = harness.events
       .slice(before)
-      .some((e) => e.kind === 'import-dialog' && e.detail === 'USE_REMOTE');
-    if (!usedRemote) return;
-    for (const entry of entries) {
+      .some((e) => e.kind === 'stop-dialog' && e.detail === 'USE_LOCAL');
+    if (answeredLocal) hasUserReplacement = true;
+    // USE_REMOTE (either dialog) drops exactly the ops the device still had
+    // unsynced when it answered (`useRemoteDiscards`): an intent is excused
+    // only if one of its ops was among them, so a write the server
+    // acknowledged and then lost is still checked. A rebuild resets the
+    // device's own counter to what the server knows, so later intents can
+    // reuse the counters of discarded ones: only the intents since the
+    // device's previous rebuild are matched.
+    const discards = harness.useRemoteDiscards;
+    harness.useRemoteDiscards = undefined;
+    if (!discards) return;
+    for (let i = rebuiltAt.get(device.name) ?? 0; i < entries.length; i++) {
+      const entry = entries[i];
       if (entry.device !== device.name || entry.discarded) continue;
-      const accepted = Math.max(
-        0,
-        ...harness.server.rows
-          .filter((row) => row.op.clientId === entry.clientId)
-          .map((row) => row.op.vectorClock[entry.clientId] ?? 0),
-      );
-      if ((entry.clock[entry.clientId] ?? 0) > accepted) entry.discarded = true;
+      const counter = entry.clock[entry.clientId] ?? 0;
+      if (
+        discards.some(
+          (op) =>
+            op.clientId === entry.clientId &&
+            op.counter > entry.counterBefore &&
+            op.counter <= counter,
+        )
+      ) {
+        entry.discarded = true;
+      }
     }
+    rebuiltAt.set(device.name, entries.length);
   };
   const devices = new Map<string, FuzzDevice>();
   for (const name of DEVICES) devices.set(name, await harness.addDevice(name));
@@ -351,10 +399,38 @@ export const runFuzz = async (options: FuzzOptions): Promise<FuzzResult> => {
   // Setup: A creates the shared entities, then every device joins.
   await harness.as(deviceOf('A'), async () => {
     for (const intent of SETUP_INTENTS) {
-      await note(intent, (await executeIntent(harness, intent)) ?? []);
+      await executeAndNote(intent);
     }
   });
   for (const name of DEVICES) await sync(deviceOf(name));
+
+  // Only a run that can replace state answers the SYNC_IMPORT conflict
+  // dialog: a generated mix with a replacement intent, a trace with one, or
+  // any run once a stop was answered with USE_LOCAL. Elsewhere the dialog
+  // still fails the run, so a full-state op no user intent made keeps the
+  // signatures of what it drops. (A backup export alone replaces nothing.)
+  const replaces = options.steps
+    ? options.steps.some((s) => s.a?.[0] === 'forceUpload' || s.a?.[0] === 'importBackup')
+    : (options.weights ?? []).some(([kind]) => REPLACEMENT_INTENTS.has(kind));
+  const answersImports = (): boolean => replaces || hasUserReplacement;
+  // Which dialogs a run answers, and with what:
+  //
+  //   run                         | SYNC_IMPORT dialog          | dialog after a stop
+  //   ----------------------------|-----------------------------|--------------------
+  //   generated, `replace` mix    | step `k`, settle R          | step `k`, settle R
+  //   generated, other mixes      | after a stop answered L:    | step `k` (own
+  //                               |   step `k`, settle R        |   stream), settle R
+  //   replay with a replacement   | step `k`, settle R          | step `k`, settle R
+  //   replay with `k` only        | after a stop answered L     | step `k`, settle R
+  //   replay without either       | never (fails the run)       | never (stop stays)
+  //
+  // A run models the whole-dataset dialog after a stop when it is generated,
+  // or replays a trace with a replacement or a dialog answer (`k`). Its steps
+  // answer with `k`, and settle with the remote data. A trace without either
+  // keeps its stops unanswered, as every trace did before the dialog was
+  // modeled. The stop stays a failure either way (#10377); what the answer
+  // drops is judged in addition.
+  const modelsStopDialog = !options.steps || replaces || options.steps.some((s) => s.k);
 
   const executed: FuzzStep[] = [];
   const runStep = async (step: FuzzStep, intent?: Intent): Promise<void> => {
@@ -363,14 +439,13 @@ export const runFuzz = async (options: FuzzOptions): Promise<FuzzResult> => {
     let applied: Intent | undefined;
     if (intent) {
       await harness.as(device, async () => {
-        const writes = await executeIntent(harness, intent);
-        if (writes) {
-          await note(intent, writes);
-          applied = intent;
-        }
+        if (await executeAndNote(intent)) applied = intent;
       });
     }
-    if (step.s) await sync(device, answerOf(step.k));
+    if (step.s) {
+      const answer = answerOf(step.k);
+      await sync(device, answersImports() ? answer : undefined, answer);
+    }
     if (step.c) await harness.compact(device);
     if (step.r) await harness.restart(device);
     if (applied || step.s || step.c || step.r) {
@@ -385,24 +460,16 @@ export const runFuzz = async (options: FuzzOptions): Promise<FuzzResult> => {
     }
   };
 
-  // Only a run that can replace state answers the SYNC_IMPORT conflict
-  // dialog: a generated mix with a replacement intent, or a trace with one or
-  // with a dialog answer. Elsewhere the dialog still fails the run, so a
-  // full-state op no user intent made keeps the signatures of what it drops.
-  // (A backup export alone replaces nothing.)
-  const replaces = options.steps
-    ? options.steps.some(
-        (s) => s.k || s.a?.[0] === 'forceUpload' || s.a?.[0] === 'importBackup',
-      )
-    : (options.weights ?? []).some(([kind]) => REPLACEMENT_INTENTS.has(kind));
-  const settleAnswer: ImportDialogAnswer | undefined = replaces
-    ? 'USE_REMOTE'
-    : undefined;
-
   if (options.steps) {
     for (const step of options.steps) await runStep(step, step.a);
   } else {
     const random = createRandom(options.seed ?? 1);
+    // Mixes without a replacement draw `k` from their own stream and keep it
+    // only in a run that answered a stop, so their other traces stay as they
+    // were.
+    const dialogRandom = replaces
+      ? random
+      : createRandom((options.seed ?? 1) ^ DIALOG_STREAM_SALT);
     let idCounter = 10;
     const nextId = (prefix: string): string => `${prefix}${++idCounter}`;
     for (let i = 0; i < (options.stepCount ?? 30); i++) {
@@ -432,7 +499,7 @@ export const runFuzz = async (options: FuzzOptions): Promise<FuzzResult> => {
           ...(random() < SYNC_PROBABILITY ? { s: 1 } : {}),
           ...(random() < COMPACT_PROBABILITY ? { c: 1 } : {}),
           ...(random() < RESTART_PROBABILITY ? { r: 1 } : {}),
-          ...(replaces ? { k: random() < USE_LOCAL_PROBABILITY ? 'L' : 'R' } : {}),
+          k: dialogRandom() < USE_LOCAL_PROBABILITY ? 'L' : 'R',
         },
         intent,
       );
@@ -441,19 +508,36 @@ export const runFuzz = async (options: FuzzOptions): Promise<FuzzResult> => {
 
   // Settle: every device syncs until a full round moves nothing. In a run
   // that can replace state, a dialog asking about an incoming replacement is
-  // answered with the remote data, which ends a run of competing replacements.
+  // answered with the remote data, which ends a run of competing replacements;
+  // in a run that models it, so is the dialog after a stop.
   harness.tick();
+  const settleStopAnswer: ImportDialogAnswer | undefined = modelsStopDialog
+    ? 'USE_REMOTE'
+    : undefined;
+  const settle = (device: FuzzDevice): Promise<void> =>
+    sync(device, answersImports() ? 'USE_REMOTE' : undefined, settleStopAnswer);
   for (let round = 0; round < SETTLE_ROUNDS; round++) {
     const seqBefore = harness.server.latestSeq;
     let pending = 0;
     for (const name of DEVICES) {
-      await sync(deviceOf(name), settleAnswer);
+      await settle(deviceOf(name));
       pending += await harness.pendingOpCount(deviceOf(name));
     }
     if (harness.server.latestSeq === seqBefore && pending === 0) break;
   }
   const observer = await harness.addDevice('F');
-  await sync(observer, settleAnswer);
+  await settle(observer);
+
+  // A generated mix without a replacement keeps `k` only in a run that
+  // answered a stop, in a step or in settle: its replay then models the dialog
+  // too (`modelsStopDialog`), and every other trace stays as it was.
+  if (
+    !options.steps &&
+    !replaces &&
+    !harness.events.some((e) => e.kind === 'stop-dialog')
+  ) {
+    for (const step of executed) delete step.k;
+  }
 
   const eventsBeforeRestart = harness.events.length;
   // Oracle: no stops or other sync failures.
